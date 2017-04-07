@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "D3D11App.h"
+#include "resource.h"
 
 using namespace DirectX;
 

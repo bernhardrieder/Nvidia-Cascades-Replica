@@ -1,4 +1,6 @@
 #pragma once
+#include "stdafx.h"
+#include "Camera.h"
 
 using namespace DirectX;
 
@@ -12,12 +14,18 @@ public:
 
 	bool Initialize() override;
 
-private:
+protected:	
 	void update(float deltaTime) override;
 	void render(float deltaTime) override;
 	bool loadContentAndShaders();
 	void unloadContentAndShaders();
+	void onResize() override;
+	void onMouseDown(WPARAM btnState, int x, int y) override;
+	void onMouseUp(WPARAM btnState, int x, int y) override;
+	void onMouseMove(WPARAM btnState, int x, int y) override;
+	void checkAndProcessKeyboardInput(float deltaTime);
 
+private:
 	// Shader resources
 	enum ConstanBuffer
 	{
@@ -65,8 +73,8 @@ private:
 	ID3D11PixelShader* m_pixelShader = nullptr;
 	ID3D11Buffer* m_constantBuffers[NumConstantBuffers];
 
+	POINT m_lastMousePos;
+	Camera m_camera;
 	// Demo parameters
 	XMMATRIX m_worldMatrix;
-	XMMATRIX m_viewMatrix;
-	XMMATRIX m_projectionMatrix;
 };

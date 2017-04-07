@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "ShaderLab.h"
+
 //#include "Shader/SimpleVertexShader.h"
 //#include "Shader/SimplePixelShader.h"
 
@@ -24,17 +25,17 @@ bool ShaderLab::Initialize()
 		MessageBox(nullptr, TEXT("Failed to load content/shaders."), TEXT("Error"), MB_OK);
 		return false;
 	}
+
+	m_camera.SetPosition(0.f, 0.0f, -20.f);
+	onResize();
 	return true;
 }
 
 void ShaderLab::update(float deltaTime)
 {
-	XMVECTOR eyePosition = XMVectorSet(0, 0, -10, 1);
-	XMVECTOR focusPoint = XMVectorSet(0, 0, 0, 1);
-	XMVECTOR upDirection = XMVectorSet(0, 1, 0, 0);
-	m_viewMatrix = XMMatrixLookAtLH(eyePosition, focusPoint, upDirection);
-	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Frame], 0, nullptr, &m_viewMatrix, 0, 0);
+	checkAndProcessKeyboardInput(deltaTime);
 
+	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Frame], 0, nullptr, &m_camera.GetView(), 0, 0);
 
 	static float angle = 0.0f;
 	angle += 90.0f * deltaTime;
@@ -181,19 +182,6 @@ bool ShaderLab::loadContentAndShaders()
 
 	SafeRelease(pixelShaderBlob);
 
-	// Setup the projection matrix.
-	RECT clientRect;
-	GetClientRect(m_windowHandle, &clientRect);
-
-	// Compute the exact client dimensions.
-	// This is required for a correct projection matrix.
-	float clientWidth = static_cast<float>(clientRect.right - clientRect.left);
-	float clientHeight = static_cast<float>(clientRect.bottom - clientRect.top);
-
-	m_projectionMatrix = XMMatrixPerspectiveFovLH(XMConvertToRadians(45.0f), clientWidth / clientHeight, 0.1f, 100.0f);
-
-	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Appliation], 0, nullptr, &m_projectionMatrix, 0, 0);
-
 	return true;
 }
 
@@ -207,4 +195,62 @@ void ShaderLab::unloadContentAndShaders()
 	SafeRelease(m_inputLayout);
 	SafeRelease(m_vertexShader);
 	SafeRelease(m_pixelShader);
+}
+
+void ShaderLab::onResize()
+{
+	static float pi = 3.1415926535f; // cmath include isn't working?!?!
+	D3D11App::onResize();
+	// The window resized, so update the aspect ratio and recompute the projection matrix.
+	m_camera.SetLens(0.10f*pi, AspectRatio(), .1f, 1000.0f);
+	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Appliation], 0, nullptr, &m_camera.GetProj(), 0, 0);
+}
+
+void ShaderLab::onMouseDown(WPARAM btnState, int x, int y)
+{
+	D3D11App::onMouseDown(btnState, x, y);
+	m_lastMousePos.x = x;
+	m_lastMousePos.y = y;
+
+	SetCapture(m_windowHandle);
+}
+
+void ShaderLab::onMouseUp(WPARAM btnState, int x, int y)
+{
+	D3D11App::onMouseUp(btnState, x, y);
+	ReleaseCapture();
+}
+
+void ShaderLab::onMouseMove(WPARAM btnState, int x, int y)
+{
+	D3D11App::onMouseMove(btnState, x, y);
+	if ((btnState & MK_LBUTTON) != 0)
+	{
+		// Make each pixel correspond to a quarter of a degree.
+		float dx = DirectX::XMConvertToRadians(0.10f*static_cast<float>(x - m_lastMousePos.x));
+		float dy = DirectX::XMConvertToRadians(0.10f*static_cast<float>(y - m_lastMousePos.y));
+
+		m_camera.Pitch(dy);
+		m_camera.RotateY(dx);
+	}
+
+	m_lastMousePos.x = x;
+	m_lastMousePos.y = y;
+}
+
+void ShaderLab::checkAndProcessKeyboardInput(float deltaTime)
+{
+	if (GetAsyncKeyState('W') & 0x8000)
+		m_camera.Walk(10.0f*deltaTime);
+
+	if (GetAsyncKeyState('S') & 0x8000)
+		m_camera.Walk(-10.0f*deltaTime);
+
+	if (GetAsyncKeyState('A') & 0x8000)
+		m_camera.Strafe(-10.0f*deltaTime);
+
+	if (GetAsyncKeyState('D') & 0x8000)
+		m_camera.Strafe(10.0f*deltaTime);
+
+	m_camera.UpdateViewMatrix();
 }

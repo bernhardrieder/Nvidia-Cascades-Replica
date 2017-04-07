@@ -46,5 +46,11 @@ inline void SafeRelease(T& ptr)
 
 #include <exception>
 #include "D3D11App.h"
+#define _USE_MATH_DEFINES
+#include <cmath>
 #include <algorithm>
 #include "ShaderLab.h"
+#include "Camera.h"
+
+//directx toolkit
+#include <SimpleMath.h>
