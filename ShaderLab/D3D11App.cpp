@@ -94,6 +94,7 @@ void D3D11App::render(float deltaTime)
 	assert(m_device);
 	assert(m_deviceContext);
 
+	//Clear!
 	m_deviceContext->ClearRenderTargetView(m_renderTargetView, Colors::CornflowerBlue);
 	m_deviceContext->ClearDepthStencilView(m_depthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 
@@ -103,6 +104,7 @@ void D3D11App::render(float deltaTime)
 	m_deviceContext->OMSetRenderTargets(1, &m_renderTargetView, m_depthStencilView);
 	m_deviceContext->OMSetDepthStencilState(m_depthStencilState, 1);
 
+	//Present Frame!!
 	m_swapChain->Present(0, 0);
 }
 
