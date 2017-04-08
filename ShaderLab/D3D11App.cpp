@@ -1,31 +1,182 @@
 #include "stdafx.h"
 #include "D3D11App.h"
+#include "resource.h"
 
 using namespace DirectX;
 
-D3D11App::D3D11App()
+D3D11App* D3D11App::m_app = nullptr; 
+
+LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
+	// Forward hwnd on because we can get messages (e.g., WM_CREATE)
+	// before CreateWindow returns, and thus before mhMainWnd is valid.
+	return D3D11App::GetApp()->MsgProc(hwnd, msg, wParam, lParam);
+}
+
+D3D11App::D3D11App(HINSTANCE hInstance, int nCmdShow) : m_hInst(hInstance) ,m_nCmdShow(nCmdShow), m_deltaTime(0)
+{
+	assert(m_app == nullptr);
+	m_app = this;
 }
 
 
 D3D11App::~D3D11App()
 {
-	UnloadContent();
-	Cleanup();
+	D3D11App::cleanup();
 }
 
-/**
-* Initialize the DirectX device and swap chain.
-*/
-int D3D11App::Init(HWND windowHandle, BOOL vSync)
+D3D11App* D3D11App::GetApp()
+{
+	return m_app;
+}
+
+bool D3D11App::Initialize()
+{
+	if (!XMVerifyCPUSupport())
+	{
+		MessageBox(nullptr, TEXT("Failed to verify DirectX Math library support."), TEXT("Error"), MB_OK);
+		return false;
+	}
+
+	if (!initWin32Application(m_hInst, m_nCmdShow))
+	{
+		MessageBox(nullptr, TEXT("Failed to create application window."), TEXT("Error"), MB_OK);
+		return false;
+	}
+
+	if (initDirectX())
+	{
+		MessageBox(nullptr, TEXT("Failed to initalize DirectX."), TEXT("Error"), MB_OK);
+		return false;
+	}
+	return true;
+}
+
+int D3D11App::Run()
+{
+	MSG msg = { 0 };
+
+	static DWORD previousTime = timeGetTime();
+	static const float targetFramerate = 30.0f;
+	static const float maxTimeStep = 1.0f / targetFramerate;
+
+	// Main message loop:
+	while (msg.message != WM_QUIT)
+	{
+		if (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
+		{
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+		}
+		else
+		{
+			DWORD currentTime = timeGetTime();
+			if(!m_paused)
+				m_deltaTime = (currentTime - previousTime) / 1000.0f;
+			else
+				m_deltaTime = 0.0f;
+
+			previousTime = currentTime;
+
+			// Cap the delta time to the max time step (useful if your 
+			// debugging and you don't want the deltaTime value to explode.
+			m_deltaTime = std::min<float>(m_deltaTime, maxTimeStep);
+
+			update(m_deltaTime);
+			render(m_deltaTime);
+		}
+	}
+
+	return static_cast<int>(msg.wParam);
+}
+
+void D3D11App::render(float deltaTime)
+{
+	assert(m_device);
+	assert(m_deviceContext);
+
+	//Clear!
+	m_deviceContext->ClearRenderTargetView(m_renderTargetView, Colors::CornflowerBlue);
+	m_deviceContext->ClearDepthStencilView(m_depthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+
+	m_deviceContext->RSSetState(m_rasterizerState);
+	m_deviceContext->RSSetViewports(1, &m_viewport);
+
+	m_deviceContext->OMSetRenderTargets(1, &m_renderTargetView, m_depthStencilView);
+	m_deviceContext->OMSetDepthStencilState(m_depthStencilState, 1);
+
+	//Present Frame!!
+	m_swapChain->Present(0, 0);
+}
+
+void D3D11App::cleanup()
+{
+	SafeRelease(m_depthStencilView);
+	SafeRelease(m_renderTargetView);
+	SafeRelease(m_depthStencilBuffer);
+	SafeRelease(m_depthStencilState);
+	SafeRelease(m_rasterizerState);
+	SafeRelease(m_swapChain);
+	SafeRelease(m_deviceContext);
+	SafeRelease(m_device);
+}
+
+void D3D11App::onResize()
+{
+	assert(m_deviceContext);
+	assert(m_device);
+	assert(m_swapChain);
+
+	// Release the old views, as they hold references to the buffers we will be destroying.  Also release the old depth/stencil buffer.
+	SafeRelease(m_renderTargetView);
+	SafeRelease(m_depthStencilView);
+	SafeRelease(m_depthStencilBuffer);
+
+	// Resize the swap chain and recreate the render target view.
+	//todo: error check
+	m_swapChain->ResizeBuffers(1, m_windowWidth, m_windowHeight, DXGI_FORMAT_R8G8B8A8_UNORM, 0);
+	ID3D11Texture2D* backBuffer;
+	//todo: error check
+	m_swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&backBuffer));
+	//todo: error check
+	m_device->CreateRenderTargetView(backBuffer, 0, &m_renderTargetView);
+	SafeRelease(backBuffer);
+
+	// Recreate the depth buffer for use with the depth/stencil view.
+	D3D11_TEXTURE2D_DESC depthStencilBufferDesc;
+	depthStencilBufferDesc.ArraySize = 1;
+	depthStencilBufferDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+	depthStencilBufferDesc.CPUAccessFlags = 0; // No CPU access required.
+	depthStencilBufferDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+	depthStencilBufferDesc.Width = m_windowWidth;
+	depthStencilBufferDesc.Height = m_windowHeight;
+	depthStencilBufferDesc.MipLevels = 1;
+	depthStencilBufferDesc.SampleDesc.Count = 1;
+	depthStencilBufferDesc.SampleDesc.Quality = 0;
+	depthStencilBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+	depthStencilBufferDesc.MiscFlags = 0;
+
+	//todo: error check
+	m_device->CreateTexture2D(&depthStencilBufferDesc, 0, &m_depthStencilBuffer);
+	//todo: error check
+	m_device->CreateDepthStencilView(m_depthStencilBuffer, 0, &m_depthStencilView);
+
+	// Initialize the viewport to occupy the entire client area.
+	m_viewport.TopLeftX = 0;
+	m_viewport.TopLeftY = 0;
+	m_viewport.Width = static_cast<float>(m_windowWidth);
+	m_viewport.Height = static_cast<float>(m_windowHeight);
+	m_viewport.MinDepth = 0.0f;
+	m_viewport.MaxDepth = 1.0f;
+}
+
+bool D3D11App::initDirectX()
 {
 	// A window handle must have been created already.
-	assert(windowHandle != 0);
-
-	m_EnableVSync = vSync;
+	assert(m_windowHandle != 0);
 
 	RECT clientRect;
-	GetClientRect(windowHandle, &clientRect);
+	GetClientRect(m_windowHandle, &clientRect);
 
 	// Compute the exact client dimensions. This will be used
 	// to initialize the render targets for our swap chain.
@@ -39,9 +190,9 @@ int D3D11App::Init(HWND windowHandle, BOOL vSync)
 	swapChainDesc.BufferDesc.Width = clientWidth;
 	swapChainDesc.BufferDesc.Height = clientHeight;
 	swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	swapChainDesc.BufferDesc.RefreshRate = QueryRefreshRate(clientWidth, clientHeight, vSync);
+	swapChainDesc.BufferDesc.RefreshRate = QueryRefreshRate(clientWidth, clientHeight, false);
 	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-	swapChainDesc.OutputWindow = windowHandle;
+	swapChainDesc.OutputWindow = m_windowHandle;
 	swapChainDesc.SampleDesc.Count = 1;
 	swapChainDesc.SampleDesc.Quality = 0;
 	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
@@ -70,38 +221,32 @@ int D3D11App::Init(HWND windowHandle, BOOL vSync)
 
 	HRESULT hr = D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_HARDWARE,
 		nullptr, createDeviceFlags, featureLevels, _countof(featureLevels),
-		D3D11_SDK_VERSION, &swapChainDesc, &m_d3dSwapChain, &m_d3dDevice, &featureLevel,
-		&m_d3dDeviceContext);
+		D3D11_SDK_VERSION, &swapChainDesc, &m_swapChain, &m_device, &featureLevel,
+		&m_deviceContext);
 
 	if (hr == E_INVALIDARG)
 	{
 		hr = D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_HARDWARE,
 			nullptr, createDeviceFlags, &featureLevels[1], _countof(featureLevels) - 1,
-			D3D11_SDK_VERSION, &swapChainDesc, &m_d3dSwapChain, &m_d3dDevice, &featureLevel,
-			&m_d3dDeviceContext);
+			D3D11_SDK_VERSION, &swapChainDesc, &m_swapChain, &m_device, &featureLevel,
+			&m_deviceContext);
 	}
 
 	if (FAILED(hr))
-	{
-		return -1;
-	}
+		return false;
 
 	// The Direct3D device and swap chain were successfully created.
 	// Now we need to initialize the buffers of the swap chain.
 	// Next initialize the back buffer of the swap chain and associate it to a 
 	// render target view.
 	ID3D11Texture2D* backBuffer;
-	hr = m_d3dSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&backBuffer);
+	hr = m_swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&backBuffer);
 	if (FAILED(hr))
-	{
-		return -1;
-	}
+		return false;
 
-	hr = m_d3dDevice->CreateRenderTargetView(backBuffer, nullptr, &m_d3dRenderTargetView);
+	hr = m_device->CreateRenderTargetView(backBuffer, nullptr, &m_renderTargetView);
 	if (FAILED(hr))
-	{
-		return -1;
-	}
+		return false;
 
 	SafeRelease(backBuffer);
 
@@ -120,17 +265,13 @@ int D3D11App::Init(HWND windowHandle, BOOL vSync)
 	depthStencilBufferDesc.SampleDesc.Quality = 0;
 	depthStencilBufferDesc.Usage = D3D11_USAGE_DEFAULT;
 
-	hr = m_d3dDevice->CreateTexture2D(&depthStencilBufferDesc, nullptr, &m_d3dDepthStencilBuffer);
+	hr = m_device->CreateTexture2D(&depthStencilBufferDesc, nullptr, &m_depthStencilBuffer);
 	if (FAILED(hr))
-	{
-		return -1;
-	}
+		return false;
 
-	hr = m_d3dDevice->CreateDepthStencilView(m_d3dDepthStencilBuffer, nullptr, &m_d3dDepthStencilView);
+	hr = m_device->CreateDepthStencilView(m_depthStencilBuffer, nullptr, &m_depthStencilView);
 	if (FAILED(hr))
-	{
-		return -1;
-	}
+		return false;
 
 	// Setup depth/stencil state.
 	D3D11_DEPTH_STENCIL_DESC depthStencilStateDesc;
@@ -141,7 +282,7 @@ int D3D11App::Init(HWND windowHandle, BOOL vSync)
 	depthStencilStateDesc.DepthFunc = D3D11_COMPARISON_LESS;
 	depthStencilStateDesc.StencilEnable = FALSE;
 
-	hr = m_d3dDevice->CreateDepthStencilState(&depthStencilStateDesc, &m_d3dDepthStencilState);
+	hr = m_device->CreateDepthStencilState(&depthStencilStateDesc, &m_depthStencilState);
 
 	// Setup rasterizer state.
 	D3D11_RASTERIZER_DESC rasterizerDesc;
@@ -159,233 +300,187 @@ int D3D11App::Init(HWND windowHandle, BOOL vSync)
 	rasterizerDesc.SlopeScaledDepthBias = 0.0f;
 
 	// Create the rasterizer state object.
-	hr = m_d3dDevice->CreateRasterizerState(&rasterizerDesc, &m_d3dRasterizerState);
+	hr = m_device->CreateRasterizerState(&rasterizerDesc, &m_rasterizerState);
 	if (FAILED(hr))
-	{
-		return -1;
-	}
+		return false;
 
 	// Initialize the viewport to occupy the entire client area.
-	m_Viewport.Width = static_cast<float>(clientWidth);
-	m_Viewport.Height = static_cast<float>(clientHeight);
-	m_Viewport.TopLeftX = 0.0f;
-	m_Viewport.TopLeftY = 0.0f;
-	m_Viewport.MinDepth = 0.0f;
-	m_Viewport.MaxDepth = 1.0f;
+	m_viewport.Width = static_cast<float>(clientWidth);
+	m_viewport.Height = static_cast<float>(clientHeight);
+	m_viewport.TopLeftX = 0.0f;
+	m_viewport.TopLeftY = 0.0f;
+	m_viewport.MinDepth = 0.0f;
+	m_viewport.MaxDepth = 1.0f;
 
 	return 0;
 }
 
-bool D3D11App::LoadContent()
+ATOM D3D11App::registerWin32Class(HINSTANCE hInstance)
 {
-//	assert(m_d3dDevice);
-//
-//	// Create an initialize the vertex buffer.
-//	D3D11_BUFFER_DESC vertexBufferDesc;
-//	ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
-//
-//	vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-//	vertexBufferDesc.ByteWidth = sizeof(VertexPosColor) * _countof(g_Vertices);
-//	vertexBufferDesc.CPUAccessFlags = 0;
-//	vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-//
-//	D3D11_SUBRESOURCE_DATA resourceData;
-//	ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
-//
-//	resourceData.pSysMem = g_Vertices;
-//
-//	HRESULT hr = g_d3dDevice->CreateBuffer(&vertexBufferDesc, &resourceData, &g_d3dVertexBuffer);
-//	if (FAILED(hr))
-//	{
-//		return false;
-//	}
-//
-//	// Create and initialize the index buffer.
-//	D3D11_BUFFER_DESC indexBufferDesc;
-//	ZeroMemory(&indexBufferDesc, sizeof(D3D11_BUFFER_DESC));
-//
-//	indexBufferDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
-//	indexBufferDesc.ByteWidth = sizeof(WORD) * _countof(g_Indicies);
-//	indexBufferDesc.CPUAccessFlags = 0;
-//	indexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-//	resourceData.pSysMem = g_Indicies;
-//
-//	hr = g_d3dDevice->CreateBuffer(&indexBufferDesc, &resourceData, &g_d3dIndexBuffer);
-//	if (FAILED(hr))
-//	{
-//		return false;
-//	}
-//
-//	// Create the constant buffers for the variables defined in the vertex shader.
-//	D3D11_BUFFER_DESC constantBufferDesc;
-//	ZeroMemory(&constantBufferDesc, sizeof(D3D11_BUFFER_DESC));
-//
-//	constantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-//	constantBufferDesc.ByteWidth = sizeof(XMMATRIX);
-//	constantBufferDesc.CPUAccessFlags = 0;
-//	constantBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-//
-//	hr = g_d3dDevice->CreateBuffer(&constantBufferDesc, nullptr, &g_d3dConstantBuffers[CB_Appliation]);
-//	if (FAILED(hr))
-//	{
-//		return false;
-//	}
-//	hr = g_d3dDevice->CreateBuffer(&constantBufferDesc, nullptr, &g_d3dConstantBuffers[CB_Frame]);
-//	if (FAILED(hr))
-//	{
-//		return false;
-//	}
-//	hr = g_d3dDevice->CreateBuffer(&constantBufferDesc, nullptr, &g_d3dConstantBuffers[CB_Object]);
-//	if (FAILED(hr))
-//	{
-//		return false;
-//	}
-//
-//	// Load the shaders
-//	//g_d3dVertexShader = LoadShader<ID3D11VertexShader>( L"../data/shaders/SimpleVertexShader.hlsl", "SimpleVertexShader", "latest" );
-//	//g_d3dPixelShader = LoadShader<ID3D11PixelShader>( L"../data/shaders/SimplePixelShader.hlsl", "SimplePixelShader", "latest" );
-//
-//	// Load the compiled vertex shader.
-//	ID3DBlob* vertexShaderBlob;
-//#if _DEBUG
-//	LPCWSTR compiledVertexShaderObject = L"SimpleVertexShader_d.cso";
-//#else
-//	LPCWSTR compiledVertexShaderObject = L"SimpleVertexShader.cso";
-//#endif
-//
-//	hr = D3DReadFileToBlob(compiledVertexShaderObject, &vertexShaderBlob);
-//	if (FAILED(hr))
-//	{
-//		return false;
-//	}
-//
-//	hr = g_d3dDevice->CreateVertexShader(vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize(), nullptr, &g_d3dVertexShader);
-//	if (FAILED(hr))
-//	{
-//		return false;
-//	}
-//
-//	// Create the input layout for the vertex shader.
-//	D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
-//	{
-//		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(VertexPosColor,Position), D3D11_INPUT_PER_VERTEX_DATA, 0 },
-//		{ "COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(VertexPosColor,Color), D3D11_INPUT_PER_VERTEX_DATA, 0 }
-//	};
-//
-//	hr = g_d3dDevice->CreateInputLayout(vertexLayoutDesc, _countof(vertexLayoutDesc), vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize(), &g_d3dInputLayout);
-//	if (FAILED(hr))
-//	{
-//		return false;
-//	}
-//
-//	SafeRelease(vertexShaderBlob);
-//
-//	// Load the compiled pixel shader.
-//	ID3DBlob* pixelShaderBlob;
-//#if _DEBUG
-//	LPCWSTR compiledPixelShaderObject = L"SimplePixelShader_d.cso";
-//#else
-//	LPCWSTR compiledPixelShaderObject = L"SimplePixelShader.cso";
-//#endif
-//
-//	hr = D3DReadFileToBlob(compiledPixelShaderObject, &pixelShaderBlob);
-//	if (FAILED(hr))
-//	{
-//		return false;
-//	}
-//
-//	hr = g_d3dDevice->CreatePixelShader(pixelShaderBlob->GetBufferPointer(), pixelShaderBlob->GetBufferSize(), nullptr, &g_d3dPixelShader);
-//	if (FAILED(hr))
-//	{
-//		return false;
-//	}
-//
-//	SafeRelease(pixelShaderBlob);
-//
-//	// Setup the projection matrix.
-//	RECT clientRect;
-//	GetClientRect(g_WindowHandle, &clientRect);
-//
-//	// Compute the exact client dimensions.
-//	// This is required for a correct projection matrix.
-//	float clientWidth = static_cast<float>(clientRect.right - clientRect.left);
-//	float clientHeight = static_cast<float>(clientRect.bottom - clientRect.top);
-//
-//	g_ProjectionMatrix = XMMatrixPerspectiveFovLH(XMConvertToRadians(45.0f), clientWidth / clientHeight, 0.1f, 100.0f);
-//
-//	g_d3dDeviceContext->UpdateSubresource(g_d3dConstantBuffers[CB_Appliation], 0, nullptr, &g_ProjectionMatrix, 0, 0);
-//
-//	return true;
-return true;
+	WNDCLASSEXW wcex;
+
+	wcex.cbSize = sizeof(WNDCLASSEX);
+
+	wcex.style = CS_HREDRAW | CS_VREDRAW;
+	wcex.lpfnWndProc = MainWndProc;
+	wcex.cbClsExtra = 0;
+	wcex.cbWndExtra = 0;
+	wcex.hInstance = hInstance;
+	wcex.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_SHADERLAB));
+	wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
+	wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+	wcex.lpszMenuName = MAKEINTRESOURCEW(IDC_SHADERLAB);
+	wcex.lpszClassName = m_szWindowClass;
+	wcex.hIconSm = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
+
+	return RegisterClassExW(&wcex);
 }
 
-void D3D11App::Update(float deltaTime)
+BOOL D3D11App::initWin32Application(HINSTANCE hInstance, int nCmdShow)
 {
-	XMVECTOR eyePosition = XMVectorSet(0, 0, -10, 1);
-	XMVECTOR focusPoint = XMVectorSet(0, 0, 0, 1);
-	XMVECTOR upDirection = XMVectorSet(0, 1, 0, 0);
-	g_ViewMatrix = XMMatrixLookAtLH(eyePosition, focusPoint, upDirection);
-	//m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Frame], 0, nullptr, &g_ViewMatrix, 0, 0);
+	// Initialize global strings
+	LoadStringW(hInstance, IDS_APP_TITLE, m_szTitle, MAX_LOADSTRING);
+	LoadStringW(hInstance, IDC_SHADERLAB, m_szWindowClass, MAX_LOADSTRING);
+	registerWin32Class(hInstance);
 
+	RECT windowRect = { 0, 0, 800, 600 };
+	AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
 
-	static float angle = 0.0f;
-	angle += 90.0f * deltaTime;
-	XMVECTOR rotationAxis = XMVectorSet(0, 1, 1, 0);
+	m_windowHandle = CreateWindowW(m_szWindowClass, m_szTitle, WS_OVERLAPPEDWINDOW,
+		CW_USEDEFAULT, CW_USEDEFAULT, windowRect.right - windowRect.left,
+		windowRect.bottom - windowRect.top, nullptr, nullptr, hInstance, nullptr);
 
-	g_WorldMatrix = XMMatrixRotationAxis(rotationAxis, XMConvertToRadians(angle));
-	//m_d3dDeviceContext->UpdateSubresource(m_d3dConstantBuffers[CB_Object], 0, nullptr, &g_WorldMatrix, 0, 0);
-}
-
-void D3D11App::Render()
-{
-	assert(m_d3dDevice);
-	assert(m_d3dDeviceContext);
-
-	Clear(DirectX::Colors::CornflowerBlue, 1.0f, 0);
-
-	m_d3dDeviceContext->RSSetState(m_d3dRasterizerState);
-	m_d3dDeviceContext->RSSetViewports(1, &m_Viewport);
-
-	m_d3dDeviceContext->OMSetRenderTargets(1, &m_d3dRenderTargetView, m_d3dDepthStencilView);
-	m_d3dDeviceContext->OMSetDepthStencilState(m_d3dDepthStencilState, 1);
-
-	Present(m_EnableVSync);
-}
-
-void D3D11App::Present(bool vSync) const
-{
-	if (vSync)
+	if (!m_windowHandle)
 	{
-		m_d3dSwapChain->Present(1, 0);
+		return FALSE;
 	}
-	else
+
+	ShowWindow(m_windowHandle, nCmdShow);
+	UpdateWindow(m_windowHandle);
+
+	return TRUE;
+}
+
+LRESULT D3D11App::MsgProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	//  WM_COMMAND  - process the application menu
+	//  WM_PAINT    - Paint the main window
+	//  WM_DESTROY  - post a quit message and return
+	switch (message)
 	{
-		m_d3dSwapChain->Present(0, 0);
+	case WM_COMMAND:
+	{
+		int wmId = LOWORD(wParam);
+		// Parse the menu selections:
+		switch (wmId)
+		{
+		case IDM_ABOUT:
+			break;
+		case IDM_EXIT:
+			DestroyWindow(hWnd);
+			break;
+		default:
+			return DefWindowProc(hWnd, message, wParam, lParam);
+		}
 	}
+	break;
+	case WM_PAINT:
+	{
+		PAINTSTRUCT ps;
+		HDC hdc = BeginPaint(hWnd, &ps);
+		// TODO: Add any drawing code that uses hdc here...
+		EndPaint(hWnd, &ps);
+	}
+	break;
+	case WM_DESTROY:
+		PostQuitMessage(0);
+		break;
+	case WM_ACTIVATE:
+		if (LOWORD(wParam) == WA_INACTIVE)
+			m_paused = true;
+		else
+			m_paused = false;
+		return 0;
+	case WM_SIZE:
+		// Save the new client area dimensions.
+		m_windowWidth = LOWORD(lParam);
+		m_windowHeight = HIWORD(lParam);
+		if (m_device)
+		{
+			if (wParam == SIZE_MINIMIZED)
+			{
+				m_paused = true;
+				m_minimized = true;
+				m_maximized = false;
+			}
+			else if (wParam == SIZE_MAXIMIZED)
+			{
+				m_paused = false;
+				m_minimized = false;
+				m_maximized = true;
+				onResize();
+			}
+			else if (wParam == SIZE_RESTORED)
+			{
+				if (m_minimized)
+				{
+					m_paused = false;
+					m_minimized = false;
+					onResize();
+				}
+				else if (m_maximized)
+				{
+					m_paused = false;
+					m_maximized = false;
+					onResize();
+				}
+				else if (m_resizing)
+				{
+					//do nothing!!
+				}
+				else
+				{
+					onResize();
+				}
+			}
+		}
+		return 0;
+	case WM_ENTERSIZEMOVE:
+		m_paused = true;
+		m_resizing = true;
+		return 0;
+	case WM_EXITSIZEMOVE:
+		m_paused = false;
+		m_resizing = false;
+		onResize();
+		return 0;
+	case WM_GETMINMAXINFO:
+		//prevent window from becoming too small
+		reinterpret_cast<MINMAXINFO*>(lParam)->ptMinTrackSize.x = 200;
+		reinterpret_cast<MINMAXINFO*>(lParam)->ptMinTrackSize.y = 200;
+		return 0;
+	case WM_LBUTTONDOWN:
+	case WM_MBUTTONDOWN:
+	case WM_RBUTTONDOWN:
+		onMouseDown(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+		return 0;
+	case WM_LBUTTONUP:
+	case WM_MBUTTONUP:
+	case WM_RBUTTONUP:
+		onMouseUp(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+		return 0;
+	case WM_MOUSEMOVE:
+		onMouseMove(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+		return 0;
+	default:
+		return DefWindowProc(hWnd, message, wParam, lParam);
+	}
+	return 0;
 }
 
-void D3D11App::UnloadContent()
+float D3D11App::AspectRatio() const
 {
-	//SafeRelease(g_d3dConstantBuffers[CB_Appliation]);
-	//SafeRelease(g_d3dConstantBuffers[CB_Frame]);
-	//SafeRelease(g_d3dConstantBuffers[CB_Object]);
-	//SafeRelease(g_d3dIndexBuffer);
-	//SafeRelease(g_d3dVertexBuffer);
-	//SafeRelease(g_d3dInputLayout);
-	//SafeRelease(g_d3dVertexShader);
-	//SafeRelease(g_d3dPixelShader);
-}
-
-void D3D11App::Cleanup()
-{
-	SafeRelease(m_d3dDepthStencilView);
-	SafeRelease(m_d3dRenderTargetView);
-	SafeRelease(m_d3dDepthStencilBuffer);
-	SafeRelease(m_d3dDepthStencilState);
-	SafeRelease(m_d3dRasterizerState);
-	SafeRelease(m_d3dSwapChain);
-	SafeRelease(m_d3dDeviceContext);
-	SafeRelease(m_d3dDevice);
+	return static_cast<float>(m_windowWidth) / static_cast<float>(m_windowHeight);
 }
 
 // This function was inspired by:
@@ -476,11 +571,4 @@ DXGI_RATIONAL D3D11App::QueryRefreshRate(UINT screenWidth, UINT screenHeight, BO
 	}
 
 	return refreshRate;
-}
-
-// Clear the color and depth buffers.
-void D3D11App::Clear(const FLOAT clearColor[4], FLOAT clearDepth, UINT8 clearStencil) const
-{
-	m_d3dDeviceContext->ClearRenderTargetView(m_d3dRenderTargetView, clearColor);
-	m_d3dDeviceContext->ClearDepthStencilView(m_d3dDepthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, clearDepth, clearStencil);
 }

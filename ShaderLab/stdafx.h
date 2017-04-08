@@ -11,6 +11,7 @@
 #define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
 // Windows Header Files:
 #include <windows.h>
+#include <windowsx.h>
 
 // C RunTime Header Files
 #include <stdlib.h>
@@ -18,7 +19,6 @@
 #include <memory.h>
 #include <tchar.h>
 #include <timeapi.h>
-
 
 // TODO: reference additional headers your program requires here
 // DirectX includes
@@ -46,4 +46,11 @@ inline void SafeRelease(T& ptr)
 
 #include <exception>
 #include "D3D11App.h"
+#define _USE_MATH_DEFINES
+#include <cmath>
 #include <algorithm>
+#include "ShaderLab.h"
+#include "Camera.h"
+
+//directx toolkit
+#include <SimpleMath.h>
