@@ -27,7 +27,7 @@ protected:
 
 private:
 	// Shader resources
-	enum ConstanBuffer
+	enum ShaderConstanBufferType
 	{
 		CB_Appliation,
 		CB_Frame,
@@ -71,6 +71,7 @@ private:
 	// Shader data
 	ID3D11VertexShader* m_vertexShader = nullptr;
 	ID3D11PixelShader* m_pixelShader = nullptr;
+	ID3D11GeometryShader* m_geometryShader = nullptr;
 	ID3D11Buffer* m_constantBuffers[NumConstantBuffers];
 
 	POINT m_lastMousePos;

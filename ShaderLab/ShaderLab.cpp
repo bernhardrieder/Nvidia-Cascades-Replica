@@ -1,9 +1,6 @@
 #include "stdafx.h"
 #include "ShaderLab.h"
 
-//#include "Shader/SimpleVertexShader.h"
-//#include "Shader/SimplePixelShader.h"
-
 using namespace DirectX;
 
 ShaderLab::ShaderLab(HINSTANCE hInstance, int nCmdShow): D3D11App(hInstance, nCmdShow)
@@ -28,6 +25,8 @@ bool ShaderLab::Initialize()
 
 	m_camera.SetPosition(0.f, 0.0f, -20.f);
 	onResize();
+
+	m_worldMatrix = XMMatrixRotationAxis(XMVectorSet(0, 1, 1, 0), XMConvertToRadians(90));
 	return true;
 }
 
@@ -41,7 +40,7 @@ void ShaderLab::update(float deltaTime)
 	angle += 90.0f * deltaTime;
 	XMVECTOR rotationAxis = XMVectorSet(0, 1, 1, 0);
 
-	m_worldMatrix = XMMatrixRotationAxis(rotationAxis, XMConvertToRadians(angle));
+	//m_worldMatrix = XMMatrixRotationAxis(rotationAxis, XMConvertToRadians(angle));
 	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Object], 0, nullptr, &m_worldMatrix, 0, 0);
 }
 
@@ -64,6 +63,8 @@ void ShaderLab::render(float deltaTime)
 
 	m_deviceContext->VSSetShader(m_vertexShader, nullptr, 0);
 	m_deviceContext->VSSetConstantBuffers(0, 3, m_constantBuffers);
+
+	m_deviceContext->GSSetShader(m_geometryShader, nullptr, 0);
 
 	m_deviceContext->RSSetState(m_rasterizerState);
 	m_deviceContext->RSSetViewports(1, &m_viewport);
@@ -181,6 +182,23 @@ bool ShaderLab::loadContentAndShaders()
 		return false;
 
 	SafeRelease(pixelShaderBlob);
+
+	ID3DBlob* geometryShaderBlob;
+#if _DEBUG
+	LPCWSTR compiledGeometryShaderObject = L"SimpleGeometryShader_d.cso";
+#else
+	LPCWSTR compiledGeometryShaderObject = L"SimpleGeometryShader.cso";
+#endif
+
+	hr = D3DReadFileToBlob(compiledGeometryShaderObject, &geometryShaderBlob);
+	if (FAILED(hr))
+		return false;
+
+	hr = m_device->CreateGeometryShader(geometryShaderBlob->GetBufferPointer(), geometryShaderBlob->GetBufferSize(), nullptr, &m_geometryShader);
+	if (FAILED(hr))
+		return false;
+
+	SafeRelease(geometryShaderBlob);
 
 	return true;
 }

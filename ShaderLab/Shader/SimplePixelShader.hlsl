@@ -1,9 +1,6 @@
-struct PixelShaderInput
-{
-    float4 color : COLOR;
-};
+#include "ShaderLab.hlsli"
 
-float4 ps( PixelShaderInput IN ) : SV_TARGET
+float4 main(GSOutput IN) : SV_TARGET
 {
     //IN.color.xyz = 0.f;
     return IN.color;
