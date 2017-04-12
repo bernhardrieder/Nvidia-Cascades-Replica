@@ -369,7 +369,6 @@ void ShaderLab::fillDensityTexture()
 	const UINT offset = 0;
 
 	m_deviceContext->IASetInputLayout(m_inputLayoutDensityVS);
-	//TODO: Create vertex buffer
 	m_deviceContext->IASetVertexBuffers(0, 1, &m_renderPortalvertexBuffer, &vertexStride, &offset);
 	m_deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
