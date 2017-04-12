@@ -14,17 +14,22 @@ public:
 
 	bool Initialize() override;
 
-protected:	
+private:	
 	void update(float deltaTime) override;
 	void render(float deltaTime) override;
-	bool loadContentAndShaders();
-	void unloadContentAndShaders();
+	bool loadContent();
+	void unloadContent();
+	bool loadShaders();
+	void unloadShaders();
 	void onResize() override;
 	void onMouseDown(WPARAM btnState, int x, int y) override;
 	void onMouseUp(WPARAM btnState, int x, int y) override;
 	void onMouseMove(WPARAM btnState, int x, int y) override;
 	void checkAndProcessKeyboardInput(float deltaTime);
-
+	bool initDirectX() override;
+	void cleanup() override;
+	void fillDensityTexture();
+	bool loadDensityFunctionShaders();
 private:
 	// Shader resources
 	enum ShaderConstanBufferType
@@ -41,11 +46,16 @@ private:
 		XMFLOAT3 Position;
 		XMFLOAT3 Color;
 	};
+	struct VertexPos
+	{
+		XMFLOAT3 Position;
+	};
 
 	// Vertex buffer data
-	ID3D11InputLayout* m_inputLayout = nullptr;
+	ID3D11InputLayout* m_inputLayoutSimpleVS = nullptr;
 	ID3D11Buffer* m_vertexBuffer = nullptr;
 	ID3D11Buffer* m_indexBuffer = nullptr;
+
 	VertexPosColor m_vertices[8] =
 	{
 		{ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT3(0.0f, 0.0f, 0.0f) }, // 0
@@ -57,7 +67,45 @@ private:
 		{ XMFLOAT3(1.0f,  1.0f,  1.0f), XMFLOAT3(1.0f, 1.0f, 1.0f) }, // 6
 		{ XMFLOAT3(1.0f, -1.0f,  1.0f), XMFLOAT3(1.0f, 0.0f, 1.0f) }  // 7
 	};
+	//VertexPos m_renderPortalVertices[6] = 
+	//{
+	//	{ XMFLOAT3(0.0f, 0.0f, 0.0f) }, // 0
+	//	{ XMFLOAT3(0.0f, 0.0f, 96.0f) }, // 1
+	//	{ XMFLOAT3(96.0f, 0.0f, 96.0f) }, // 2
+	//	{ XMFLOAT3(0.0f, 0.0f, 0.0f) }, // 3
+	//	{ XMFLOAT3(96.0f, 0.0f, 96.0f) }, // 4
+	//	{ XMFLOAT3(96.0f, 0.0f, 0.0f) } // 5
+	//};
 
+	//XY
+	//VertexPos m_renderPortalVertices[6] =
+	//{
+	//	{ XMFLOAT3(0.0f, 0.0f, 0.0f) }, // 0
+	//	{ XMFLOAT3(0.0f, 96.0f, 0.f) }, // 1
+	//	{ XMFLOAT3(96.0f, 96.0f, 0.0f) }, // 2
+	//	{ XMFLOAT3(0.0f, 0.0f, 0.0f) }, // 3
+	//	{ XMFLOAT3(96.0f, 96.0f, 0.0f) }, // 4
+	//	{ XMFLOAT3(96.0f, 0.0f, 0.0f) } // 5
+	//};
+	VertexPos m_renderPortalVertices[6] =
+	{
+		{ XMFLOAT3(-1.0f, -1.0f, 0.0f) }, // 0
+		{ XMFLOAT3(-1.0f, 1.0f, 0.f) }, // 1
+		{ XMFLOAT3(1.0f, 1.0f, 0.0f) }, // 2
+		{ XMFLOAT3(-1.0f, -1.0f, 0.0f) }, // 3
+		{ XMFLOAT3(1.0f, 1.0f, 0.0f) }, // 4
+		{ XMFLOAT3(1.0f, -1.0f, 0.0f) } // 5
+	};
+
+	//VertexPos m_renderPortalVertices[6] =
+	//{
+	//	{ XMFLOAT3(0.0f, 0.0f, 0.0f) }, // 0
+	//	{ XMFLOAT3(0.0f, 0.0f, 0.96f) }, // 1
+	//	{ XMFLOAT3(0.96f, 0.0f, 0.96f) }, // 2
+	//	{ XMFLOAT3(0.0f, 0.0f, 0.0f) }, // 3
+	//	{ XMFLOAT3(0.96f, 0.0f, 0.96f) }, // 4
+	//	{ XMFLOAT3(0.96f, 0.0f, 0.0f) } // 5
+	//};
 	WORD m_indices[36] =
 	{
 		0, 1, 2, 0, 2, 3,
@@ -69,13 +117,26 @@ private:
 	};
 
 	// Shader data
-	ID3D11VertexShader* m_vertexShader = nullptr;
-	ID3D11PixelShader* m_pixelShader = nullptr;
-	ID3D11GeometryShader* m_geometryShader = nullptr;
+	ID3D11VertexShader* m_simpleVS = nullptr;
+	ID3D11PixelShader* m_simplePS = nullptr;
+	ID3D11GeometryShader* m_simpleGS = nullptr;
 	ID3D11Buffer* m_constantBuffers[NumConstantBuffers];
 
 	POINT m_lastMousePos;
 	Camera m_camera;
 	// Demo parameters
-	XMMATRIX m_worldMatrix;
+	SimpleMath::Matrix m_worldMatrix;
+
+
+	/** Density Variables */
+	ID3D11Texture3D* m_densityTex3D = nullptr;
+	ID3D11RenderTargetView* m_densityTex3D_RTV = nullptr;
+	ID3D11ShaderResourceView* m_densityTex3D_SRV = nullptr;
+
+	bool m_isDensityTextureCreated = false;
+	ID3D11InputLayout* m_inputLayoutDensityVS = nullptr;
+	ID3D11Buffer* m_renderPortalvertexBuffer = nullptr;
+	ID3D11VertexShader* m_densityVS;
+	ID3D11GeometryShader* m_densityGS;
+	ID3D11PixelShader* m_densityPS;
 };

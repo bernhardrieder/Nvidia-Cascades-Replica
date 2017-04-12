@@ -44,7 +44,7 @@ bool D3D11App::Initialize()
 		return false;
 	}
 
-	if (initDirectX())
+	if (!initDirectX())
 	{
 		MessageBox(nullptr, TEXT("Failed to initalize DirectX."), TEXT("Error"), MB_OK);
 		return false;
@@ -162,12 +162,7 @@ void D3D11App::onResize()
 	m_device->CreateDepthStencilView(m_depthStencilBuffer, 0, &m_depthStencilView);
 
 	// Initialize the viewport to occupy the entire client area.
-	m_viewport.TopLeftX = 0;
-	m_viewport.TopLeftY = 0;
-	m_viewport.Width = static_cast<float>(m_windowWidth);
-	m_viewport.Height = static_cast<float>(m_windowHeight);
-	m_viewport.MinDepth = 0.0f;
-	m_viewport.MaxDepth = 1.0f;
+	setViewportDimensions(static_cast<FLOAT>(m_windowWidth), static_cast<FLOAT>(m_windowHeight));
 }
 
 bool D3D11App::initDirectX()
@@ -175,22 +170,14 @@ bool D3D11App::initDirectX()
 	// A window handle must have been created already.
 	assert(m_windowHandle != 0);
 
-	RECT clientRect;
-	GetClientRect(m_windowHandle, &clientRect);
-
-	// Compute the exact client dimensions. This will be used
-	// to initialize the render targets for our swap chain.
-	unsigned int clientWidth = clientRect.right - clientRect.left;
-	unsigned int clientHeight = clientRect.bottom - clientRect.top;
-
 	DXGI_SWAP_CHAIN_DESC swapChainDesc;
 	ZeroMemory(&swapChainDesc, sizeof(DXGI_SWAP_CHAIN_DESC));
 
 	swapChainDesc.BufferCount = 1;
-	swapChainDesc.BufferDesc.Width = clientWidth;
-	swapChainDesc.BufferDesc.Height = clientHeight;
+	swapChainDesc.BufferDesc.Width = m_windowWidth;
+	swapChainDesc.BufferDesc.Height = m_windowHeight;
 	swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	swapChainDesc.BufferDesc.RefreshRate = QueryRefreshRate(clientWidth, clientHeight, false);
+	swapChainDesc.BufferDesc.RefreshRate = QueryRefreshRate(m_windowWidth, m_windowHeight, false);
 	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	swapChainDesc.OutputWindow = m_windowHandle;
 	swapChainDesc.SampleDesc.Count = 1;
@@ -258,8 +245,8 @@ bool D3D11App::initDirectX()
 	depthStencilBufferDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
 	depthStencilBufferDesc.CPUAccessFlags = 0; // No CPU access required.
 	depthStencilBufferDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-	depthStencilBufferDesc.Width = clientWidth;
-	depthStencilBufferDesc.Height = clientHeight;
+	depthStencilBufferDesc.Width = m_windowWidth;
+	depthStencilBufferDesc.Height = m_windowHeight;
 	depthStencilBufferDesc.MipLevels = 1;
 	depthStencilBufferDesc.SampleDesc.Count = 1;
 	depthStencilBufferDesc.SampleDesc.Quality = 0;
@@ -305,14 +292,19 @@ bool D3D11App::initDirectX()
 		return false;
 
 	// Initialize the viewport to occupy the entire client area.
-	m_viewport.Width = static_cast<float>(clientWidth);
-	m_viewport.Height = static_cast<float>(clientHeight);
+	setViewportDimensions(static_cast<FLOAT>(m_windowWidth), static_cast<FLOAT>(m_windowHeight));
+
+	return true;
+}
+
+void D3D11App::setViewportDimensions(FLOAT width, FLOAT height)
+{
+	m_viewport.Width = width;
+	m_viewport.Height = height;
 	m_viewport.TopLeftX = 0.0f;
 	m_viewport.TopLeftY = 0.0f;
 	m_viewport.MinDepth = 0.0f;
 	m_viewport.MaxDepth = 1.0f;
-
-	return 0;
 }
 
 ATOM D3D11App::registerWin32Class(HINSTANCE hInstance)
@@ -343,7 +335,7 @@ BOOL D3D11App::initWin32Application(HINSTANCE hInstance, int nCmdShow)
 	LoadStringW(hInstance, IDC_SHADERLAB, m_szWindowClass, MAX_LOADSTRING);
 	registerWin32Class(hInstance);
 
-	RECT windowRect = { 0, 0, 800, 600 };
+	RECT windowRect = { 0, 0, m_windowWidth, m_windowHeight };
 	AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
 
 	m_windowHandle = CreateWindowW(m_szWindowClass, m_szTitle, WS_OVERLAPPEDWINDOW,

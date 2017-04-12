@@ -31,8 +31,9 @@ protected:
 
 	BOOL initWin32Application(HINSTANCE hInstance, int nCmdShow);
 	ATOM registerWin32Class(HINSTANCE hInstance);
-	bool initDirectX();
+	virtual bool initDirectX();
 
+	void setViewportDimensions(FLOAT width, FLOAT height);
 	static DXGI_RATIONAL QueryRefreshRate(UINT screenWidth, UINT screenHeight, BOOL vsync);
 
 protected:
