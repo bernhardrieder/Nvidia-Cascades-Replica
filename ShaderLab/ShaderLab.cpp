@@ -71,6 +71,7 @@ void ShaderLab::render(float deltaTime)
 	if (!m_isDensityTextureCreated)
 		fillDensityTexture();
 
+	/** SAMPLE CODE */
 	//Clear!
 	m_deviceContext->ClearRenderTargetView(m_renderTargetView, DirectX::Colors::CornflowerBlue);
 	m_deviceContext->ClearDepthStencilView(m_depthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
@@ -87,6 +88,9 @@ void ShaderLab::render(float deltaTime)
 	m_deviceContext->VSSetConstantBuffers(0, 3, m_constantBuffers);
 
 	m_deviceContext->GSSetShader(m_simpleGS, nullptr, 0);
+	m_deviceContext->GSSetShaderResources(0, 1, &m_densityTex3D_SRV);
+	auto samplerState = m_commonStates->LinearWrap();
+	m_deviceContext->GSSetSamplers(0, 1, &samplerState);
 
 	m_deviceContext->RSSetState(m_rasterizerState);
 	m_deviceContext->RSSetViewports(1, &m_viewport);
@@ -352,9 +356,10 @@ bool ShaderLab::initDirectX()
 	ZeroMemory(&srvDesc, sizeof(D3D11_SHADER_RESOURCE_VIEW_DESC));
 	srvDesc.Format = texDesc.Format;
 	srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE3D;
-	srvDesc.Texture3D.MipLevels = 0;
+	srvDesc.Texture3D.MipLevels = texDesc.MipLevels;
+	srvDesc.Texture3D.MostDetailedMip = 0;
 
-	hr = m_device->CreateShaderResourceView(m_densityTex3D, nullptr, &m_densityTex3D_SRV);
+	hr = m_device->CreateShaderResourceView(m_densityTex3D, &srvDesc, &m_densityTex3D_SRV);
 	if (FAILED(hr))
 		return false;
 
@@ -406,8 +411,14 @@ void ShaderLab::fillDensityTexture()
 	//m_swapChain->Present(0, 0);
 
 
+	/** RESET */
+	//reset render target - otherwise the density SRV can't be used
+	m_deviceContext->OMSetRenderTargets(0, nullptr, nullptr);
+
+	//release density rtv?
+
 	setViewportDimensions(static_cast<FLOAT>(m_windowWidth), static_cast<FLOAT>(m_windowHeight));
-	//m_isDensityTextureCreated = true;
+	m_isDensityTextureCreated = true;
 }
 
 bool ShaderLab::loadDensityFunctionShaders()
