@@ -39,6 +39,9 @@
     <ClInclude Include="Camera.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="LookUpTables.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -82,6 +85,12 @@
       <Filter>Shader</Filter>
     </FxCompile>
     <FxCompile Include="Shader\create_density_tex3d_VS.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Shader\generate_rock_GS.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Shader\generate_rock_VS.hlsl">
       <Filter>Shader</Filter>
     </FxCompile>
   </ItemGroup>
