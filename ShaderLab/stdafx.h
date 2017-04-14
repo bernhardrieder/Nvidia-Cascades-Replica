@@ -44,6 +44,8 @@ inline void SafeRelease(T& ptr)
 	}
 }
 
+#include <memory>
+#include <wchar.h>
 #include <exception>
 #include "D3D11App.h"
 #define _USE_MATH_DEFINES
@@ -53,4 +55,20 @@ inline void SafeRelease(T& ptr)
 #include "Camera.h"
 
 //directx toolkit
-#include <SimpleMath.h>
+#include "CommonStates.h"
+#include "DDSTextureLoader.h"
+#include "DirectXHelpers.h"
+#include "Effects.h"
+#include "GamePad.h"
+#include "GeometricPrimitive.h"
+#include "GraphicsMemory.h"
+#include "Keyboard.h"
+#include "Model.h"
+#include "Mouse.h"
+#include "PrimitiveBatch.h"
+#include "ScreenGrab.h"
+#include "SimpleMath.h"
+#include "SpriteBatch.h"
+#include "SpriteFont.h"
+#include "VertexTypes.h"
+#include "WICTextureLoader.h"
