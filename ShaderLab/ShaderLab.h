@@ -1,6 +1,7 @@
 #pragma once
 #include "stdafx.h"
 #include "Camera.h"
+#include <CommonStates.h>
 
 using namespace DirectX;
 
@@ -17,8 +18,8 @@ public:
 private:	
 	void update(float deltaTime) override;
 	void render(float deltaTime) override;
-	bool loadContent();
-	void unloadContent();
+	bool loadBuffers();
+	void unloadBuffers();
 	bool loadShaders();
 	void unloadShaders();
 	void onResize() override;
@@ -30,6 +31,9 @@ private:
 	void cleanup() override;
 	void fillDensityTexture();
 	bool loadDensityFunctionShaders();
+	bool loadTextures();
+	void unloadTextures();
+
 private:
 	// Shader resources
 	enum ShaderConstanBufferType
@@ -67,26 +71,7 @@ private:
 		{ XMFLOAT3(1.0f,  1.0f,  1.0f), XMFLOAT3(1.0f, 1.0f, 1.0f) }, // 6
 		{ XMFLOAT3(1.0f, -1.0f,  1.0f), XMFLOAT3(1.0f, 0.0f, 1.0f) }  // 7
 	};
-	//VertexPos m_renderPortalVertices[6] = 
-	//{
-	//	{ XMFLOAT3(0.0f, 0.0f, 0.0f) }, // 0
-	//	{ XMFLOAT3(0.0f, 0.0f, 96.0f) }, // 1
-	//	{ XMFLOAT3(96.0f, 0.0f, 96.0f) }, // 2
-	//	{ XMFLOAT3(0.0f, 0.0f, 0.0f) }, // 3
-	//	{ XMFLOAT3(96.0f, 0.0f, 96.0f) }, // 4
-	//	{ XMFLOAT3(96.0f, 0.0f, 0.0f) } // 5
-	//};
 
-	//XY
-	//VertexPos m_renderPortalVertices[6] =
-	//{
-	//	{ XMFLOAT3(0.0f, 0.0f, 0.0f) }, // 0
-	//	{ XMFLOAT3(0.0f, 96.0f, 0.f) }, // 1
-	//	{ XMFLOAT3(96.0f, 96.0f, 0.0f) }, // 2
-	//	{ XMFLOAT3(0.0f, 0.0f, 0.0f) }, // 3
-	//	{ XMFLOAT3(96.0f, 96.0f, 0.0f) }, // 4
-	//	{ XMFLOAT3(96.0f, 0.0f, 0.0f) } // 5
-	//};
 	VertexPos m_renderPortalVertices[6] =
 	{
 		{ XMFLOAT3(-1.0f, -1.0f, 0.0f) }, // 0
@@ -97,15 +82,6 @@ private:
 		{ XMFLOAT3(1.0f, -1.0f, 0.0f) } // 5
 	};
 
-	//VertexPos m_renderPortalVertices[6] =
-	//{
-	//	{ XMFLOAT3(0.0f, 0.0f, 0.0f) }, // 0
-	//	{ XMFLOAT3(0.0f, 0.0f, 0.96f) }, // 1
-	//	{ XMFLOAT3(0.96f, 0.0f, 0.96f) }, // 2
-	//	{ XMFLOAT3(0.0f, 0.0f, 0.0f) }, // 3
-	//	{ XMFLOAT3(0.96f, 0.0f, 0.96f) }, // 4
-	//	{ XMFLOAT3(0.96f, 0.0f, 0.0f) } // 5
-	//};
 	WORD m_indices[36] =
 	{
 		0, 1, 2, 0, 2, 3,
@@ -139,4 +115,11 @@ private:
 	ID3D11VertexShader* m_densityVS;
 	ID3D11GeometryShader* m_densityGS;
 	ID3D11PixelShader* m_densityPS;
+
+	const size_t m_noiseTexCount = 8;
+	std::unique_ptr<CommonStates> m_commonStates;
+	ID3D11ShaderResourceView* m_noiseTexSRV[8];
+	const std::wstring m_noiseTexPrefix = L"Textures/Noise/";
+	const std::wstring m_noiseTexFilename[8] = {	L"lichen1_disp.dds", L"lichen2_disp.dds", L"lichen3_disp.dds", L"lichen4_disp.dds",  
+													L"lichen5_disp.dds", L"lichen6_disp.dds", L"lichen7_disp.dds", L"lichen8_disp.dds" };
 };

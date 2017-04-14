@@ -75,13 +75,13 @@
     <FxCompile Include="Shader\SimpleGeometryShader.hlsl">
       <Filter>Shader</Filter>
     </FxCompile>
-    <FxCompile Include="create_density_tex3d_VS.hlsl">
+    <FxCompile Include="Shader\create_density_tex3d_GS.hlsl">
       <Filter>Shader</Filter>
     </FxCompile>
-    <FxCompile Include="create_density_tex3d_PS.hlsl">
+    <FxCompile Include="Shader\create_density_tex3d_PS.hlsl">
       <Filter>Shader</Filter>
     </FxCompile>
-    <FxCompile Include="create_density_tex3d_GS.hlsl">
+    <FxCompile Include="Shader\create_density_tex3d_VS.hlsl">
       <Filter>Shader</Filter>
     </FxCompile>
   </ItemGroup>
@@ -93,6 +93,9 @@
   <ItemGroup>
     <None Include="packages.config" />
     <None Include="Shader\ShaderLab.hlsli">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\inoise.hlsli">
       <Filter>Shader</Filter>
     </None>
   </ItemGroup>

@@ -1,5 +1,7 @@
 #include "stdafx.h"
 #include "ShaderLab.h"
+#include <fstream>
+#include <minwinbase.h>
 
 using namespace DirectX;
 using namespace DirectX::SimpleMath;
@@ -11,15 +13,16 @@ ShaderLab::ShaderLab(HINSTANCE hInstance, int nCmdShow): D3D11App(hInstance, nCm
 ShaderLab::~ShaderLab()
 {
 	ShaderLab::cleanup();
-	unloadContent();
+	unloadBuffers();
 	unloadShaders();
+	unloadTextures();
 }
 
 bool ShaderLab::Initialize()
 {
 	if (!D3D11App::Initialize())
 		return false;
-	if (!loadContent())
+	if (!loadBuffers())
 	{
 		MessageBox(nullptr, TEXT("Failed to load content."), TEXT("Error"), MB_OK);
 		return false;
@@ -29,7 +32,14 @@ bool ShaderLab::Initialize()
 		MessageBox(nullptr, TEXT("Failed to load shaders."), TEXT("Error"), MB_OK);
 		return false;
 	}
+	if(!loadTextures())	
+	{
+		MessageBox(nullptr, TEXT("Failed to load textures."), TEXT("Error"), MB_OK);
+		return false;
+	}
 
+
+	m_commonStates = std::make_unique<CommonStates>(m_device);
 	m_camera.SetPosition(0.f, 0.0f, -20.f);
 	onResize();
 
@@ -101,7 +111,7 @@ void ShaderLab::render(float deltaTime)
 }
 
 //
-bool ShaderLab::loadContent()
+bool ShaderLab::loadBuffers()
 {
 	assert(m_device);
 
@@ -137,7 +147,7 @@ bool ShaderLab::loadContent()
 	return true;
 }
 
-void ShaderLab::unloadContent()
+void ShaderLab::unloadBuffers()
 {
 	SafeRelease(m_indexBuffer);
 	SafeRelease(m_vertexBuffer);
@@ -167,9 +177,9 @@ bool ShaderLab::loadShaders()
 	// Load the compiled vertex shader.
 	ID3DBlob* vertexShaderBlob;
 #if _DEBUG
-	LPCWSTR compiledVertexShaderObject = L"SimpleVertexShader_d.cso";
+	LPCWSTR compiledVertexShaderObject = L"Shader/SimpleVertexShader_d.cso";
 #else
-	LPCWSTR compiledVertexShaderObject = L"SimpleVertexShader.cso";
+	LPCWSTR compiledVertexShaderObject = L"Shader/SimpleVertexShader.cso";
 #endif
 
 	hr = D3DReadFileToBlob(compiledVertexShaderObject, &vertexShaderBlob);
@@ -196,9 +206,9 @@ bool ShaderLab::loadShaders()
 	// Load the compiled pixel shader.
 	ID3DBlob* pixelShaderBlob;
 #if _DEBUG
-	LPCWSTR compiledPixelShaderObject = L"SimplePixelShader_d.cso";
+	LPCWSTR compiledPixelShaderObject = L"Shader/SimplePixelShader_d.cso";
 #else
-	LPCWSTR compiledPixelShaderObject = L"SimplePixelShader.cso";
+	LPCWSTR compiledPixelShaderObject = L"Shader/SimplePixelShader.cso";
 #endif
 
 	hr = D3DReadFileToBlob(compiledPixelShaderObject, &pixelShaderBlob);
@@ -213,9 +223,9 @@ bool ShaderLab::loadShaders()
 
 	ID3DBlob* geometryShaderBlob;
 #if _DEBUG
-	LPCWSTR compiledGeometryShaderObject = L"SimpleGeometryShader_d.cso";
+	LPCWSTR compiledGeometryShaderObject = L"Shader/SimpleGeometryShader_d.cso";
 #else
-	LPCWSTR compiledGeometryShaderObject = L"SimpleGeometryShader.cso";
+	LPCWSTR compiledGeometryShaderObject = L"Shader/SimpleGeometryShader.cso";
 #endif
 
 	hr = D3DReadFileToBlob(compiledGeometryShaderObject, &geometryShaderBlob);
@@ -383,6 +393,10 @@ void ShaderLab::fillDensityTexture()
 	m_deviceContext->RSSetViewports(1, &m_viewport);
 
 	m_deviceContext->PSSetShader(m_densityPS, nullptr, 0);
+	m_deviceContext->PSSetShaderResources(0, m_noiseTexCount, m_noiseTexSRV );
+	
+	auto samplerState = m_commonStates->LinearWrap();
+	m_deviceContext->PSSetSamplers(0, 1, &samplerState);
 
 	//output merger
 	m_deviceContext->OMSetRenderTargets(1, &m_densityTex3D_RTV, nullptr);
@@ -401,13 +415,13 @@ bool ShaderLab::loadDensityFunctionShaders()
 	ID3DBlob *vsBlob, *gsBlob, *psBlob;
 
 #if _DEBUG
-	LPCWSTR compiledVS = L"create_density_tex3d_VS_d.cso";
-	LPCWSTR compiledGS = L"create_density_tex3d_GS_d.cso";
-	LPCWSTR compilesPS = L"create_density_tex3d_PS_d.cso";
+	LPCWSTR compiledVS = L"Shader/create_density_tex3d_VS_d.cso";
+	LPCWSTR compiledGS = L"Shader/create_density_tex3d_GS_d.cso";
+	LPCWSTR compilesPS = L"Shader/create_density_tex3d_PS_d.cso";
 #else
-	LPCWSTR compiledVS = L"create_density_tex3d_VS.cso";
-	LPCWSTR compiledGS = L"create_density_tex3d_GS.cso";
-	LPCWSTR compilesPS = L"create_density_tex3d_PS.cso";
+	LPCWSTR compiledVS = L"Shader/create_density_tex3d_VS.cso";
+	LPCWSTR compiledGS = L"Shader/create_density_tex3d_GS.cso";
+	LPCWSTR compilesPS = L"Shader/create_density_tex3d_PS.cso";
 #endif
 
 	HRESULT HR_VS, HR_GS, HR_PS;
@@ -458,4 +472,27 @@ bool ShaderLab::loadDensityFunctionShaders()
 		return false;
 
 	return true;
+}
+
+bool ShaderLab::loadTextures()
+{
+	for(int i = 0; i < m_noiseTexCount; ++i)
+	{
+		// Load the texture in.
+		auto filename = (m_noiseTexPrefix + m_noiseTexFilename[i]);
+		HRESULT hr = CreateDDSTextureFromFile(m_device, filename.c_str(), nullptr, &m_noiseTexSRV[i]);
+
+		if (FAILED(hr))
+			return false;
+	}
+	
+	return true;
+}
+
+void ShaderLab::unloadTextures()
+{
+	for (int i = 0; i < m_noiseTexCount; ++i)
+	{
+		SafeRelease(m_noiseTexSRV[i]);
+	}
 }
