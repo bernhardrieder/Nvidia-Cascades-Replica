@@ -62,7 +62,8 @@ float main(g2pConnector input) : SV_TARGET
     //pillar (slide 12)
     for (int i = 0; i < 3; ++i)
     {
-        density += 1 / length(input.pos.xy - pillars[i]) - 1;
+        float x = inoise(input.pos.xyzw) * 4.5f;
+        density += 1 / length(input.pos.xy - mul(pillars[i], rotate2d(x))) - 1;
     }
     
     //water flow channel (slide 14)
