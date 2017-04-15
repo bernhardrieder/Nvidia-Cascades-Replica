@@ -42,6 +42,15 @@ SamplerState s;
 //SamplerState Nearest_ClampXY_WrapZ;
 //SamplerState LinearRepeat;
 
+float3 ComputeNormal(Texture3D tex, SamplerState s, float3 uvw)
+{
+    float4 step = float4(inv_voxelDim.xyz, 0);
+    float3 gradient = float3(tex.SampleLevel(s, uvw + step.xww, 0).x - tex.SampleLevel(s, uvw - step.xww, 0).x,
+                             tex.SampleLevel(s, uvw + step.wwy, 0).x - tex.SampleLevel(s, uvw - step.wwy, 0).x,
+                             tex.SampleLevel(s, uvw + step.wzw, 0).x - tex.SampleLevel(s, uvw - step.wzw, 0).x);
+    return normalize(-gradient);
+}
+
 g2vbConnector PlaceVertOnEdge(v2gConnector input, int edgeNum)
 {
     // Along this cell edge, where does the density value hit zero?
@@ -57,12 +66,12 @@ g2vbConnector PlaceVertOnEdge(v2gConnector input, int edgeNum)
     g2vbConnector output;
     output.wsCoord_Ambo.xyz = wsCoord;
     //output.wsCoord_Ambo.w = grad_ambo_tex.SampleLevel(s, uvw, 0).w;
-    //output.wsNormal = ComputeNormal(tex, s, uvw);
+    output.wsNormal = ComputeNormal(tex, s, uvw);
 
     output.wsCoord_Ambo.w = 0.f; //DUMMY
-    output.wsNormal = 0.f; // DUMMY
     return output;
 }
+
 
 [maxvertexcount(15)]
 void main(point v2gConnector input[1], inout TriangleStream<g2vbConnector> outStream)

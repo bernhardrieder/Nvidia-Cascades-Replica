@@ -102,7 +102,9 @@
     <FxCompile Include="Shader\generate_rock_VB_GS.hlsl">
       <Filter>Shader</Filter>
     </FxCompile>
-    <FxCompile Include="Shader\generate_rock_VB_VS.hlsl" />
+    <FxCompile Include="Shader\generate_rock_VB_VS.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="ShaderLab.rc">

@@ -1,6 +1,8 @@
 #include "stdafx.h"
 #include "RockVertexBufferGenerator.h"
 
+//see https://msdn.microsoft.com/en-us/library/windows/desktop/bb205122(v=vs.85).aspx for geometry shader with stream output
+// https://www.gamedev.net/blog/272/entry-1913400-using-d3d11-stream-out-for-debugging/
 
 RockVertexBufferGenerator::RockVertexBufferGenerator()
 {
@@ -79,7 +81,11 @@ bool RockVertexBufferGenerator::loadShaders(ID3D11Device* device)
 		{ 0, "POSITION", 0, 0, 4, 0 },   
 		{ 0, "NORMAL", 0, 0, 3, 0 }
 	};
-	HR_GS = device->CreateGeometryShaderWithStreamOutput(gsBlob->GetBufferPointer(), gsBlob->GetBufferSize(), pDecl, sizeof(pDecl), NULL, 0, 0, NULL, &m_geometryShader);
+
+	UINT stride = 9 * sizeof(float); // *NOT* sizeof the above array!
+	UINT elems = sizeof(pDecl) / sizeof(D3D11_SO_DECLARATION_ENTRY);
+
+	HR_GS = device->CreateGeometryShaderWithStreamOutput(gsBlob->GetBufferPointer(), gsBlob->GetBufferSize(), pDecl, elems, NULL, 0, 0, NULL, &m_geometryShader);
 
 	if (FAILED(HR_VS) || FAILED(HR_GS))
 		return false;
@@ -142,7 +148,7 @@ bool RockVertexBufferGenerator::loadVertexBuffer(ID3D11Device* device)
 	ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
 	vertexBufferDesc.BindFlags = D3D11_BIND_STREAM_OUTPUT;
 	//TODO: check and set right num of outputs!
-	vertexBufferDesc.ByteWidth = sizeof(GeometryShaderOutput) * 10000;
+	vertexBufferDesc.ByteWidth = sizeof(GeometryShaderOutput) * 96*96*256*15;
 	vertexBufferDesc.CPUAccessFlags = 0;
 	vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
 
