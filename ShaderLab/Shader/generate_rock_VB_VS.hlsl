@@ -37,7 +37,9 @@ v2gConnector main(a2vConnector a2v)
     float3 uvw = WS_to_UVW(wsCoord);
 
     // sample the 3D texture to get the density values at the 8 corners
-    float2 step = float2(wsVoxelSize.x, 0);
+    //float2 step = float2(wsVoxelSize.x, 0); // so used in cascade secrets shader code
+    float2 step = float2(inv_voxelDimMinusOne.x, 0); // inv_voxelDimMinusOne used in cascade shader code ==> makes more sense?!
+    //TODO: MAYBE CHANGE STEP!!
     float4 f0123 = float4(  tex.SampleLevel(s, uvw + step.yyy, 0).x,
                             tex.SampleLevel(s, uvw + step.yyx, 0).x,
                             tex.SampleLevel(s, uvw + step.xyx, 0).x,
@@ -56,11 +58,11 @@ v2gConnector main(a2vConnector a2v)
     
     // fill out return struct using these values, then on to the Geometry Shader.
     v2gConnector v2g;
+    // from cascade demo: v2f.wsCoord = float4(wsCoord, instance_wsYpos_bottom_of_slice_above[inst]);
+    v2g.wsCoord = wsCoord;
+    v2g.uvw = uvw;
     v2g.f0123 = f0123;
     v2g.f4567 = f4567;
     v2g.mc_case = mc_case;
-    v2g.uvw = uvw;
-    v2g.wsCoord = wsCoord;
     return v2g;
-
 }

@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "RockVertexBufferGenerator.h"
+#include "LookUpTables.h"
 
 //see https://msdn.microsoft.com/en-us/library/windows/desktop/bb205122(v=vs.85).aspx for geometry shader with stream output
 // https://www.gamedev.net/blog/272/entry-1913400-using-d3d11-stream-out-for-debugging/
@@ -108,9 +109,16 @@ bool RockVertexBufferGenerator::loadShaders(ID3D11Device* device)
 bool RockVertexBufferGenerator::loadConstantBuffers(ID3D11Device* device)
 {
 	CB_MC_LUT_1 mcLut1Data;
-	//TODO: fill data
+	memcpy(mcLut1Data.case_to_numpolys, g_mcCaseToNumpolysLUT, sizeof g_mcCaseToNumpolysLUT);
+	memcpy(mcLut1Data.cornerAmask0123, g_mcCornerAmask0123LUT, sizeof g_mcCornerAmask0123LUT);
+	memcpy(mcLut1Data.cornerAmask4567, g_mcCornerAmask4567LUT, sizeof g_mcCornerAmask4567LUT);
+	memcpy(mcLut1Data.cornerBmask0123, g_mcCornerBmask0123LUT, sizeof g_mcCornerBmask0123LUT);
+	memcpy(mcLut1Data.cornerBmask4567, g_mcCornerBmask4567LUT, sizeof g_mcCornerBmask4567LUT);
+	memcpy(mcLut1Data.vec_start, g_mcVecStartLUT, sizeof g_mcVecStartLUT);
+	memcpy(mcLut1Data.vec_dir, g_mcVecDirLUT, sizeof g_mcVecDirLUT);
+
 	CB_MC_LUT_2 mcLut2Data;
-	//TODO: fill data
+	memcpy(mcLut2Data.g_triTable, g_mcTriLUT, sizeof g_mcTriLUT);
 
 	D3D11_BUFFER_DESC bufferDesc;
 	ZeroMemory(&bufferDesc, sizeof(D3D11_BUFFER_DESC));

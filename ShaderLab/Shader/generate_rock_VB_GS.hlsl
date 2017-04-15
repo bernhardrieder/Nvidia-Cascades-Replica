@@ -52,15 +52,22 @@ float3 ComputeNormal(Texture3D tex, SamplerState s, float3 uvw)
 }
 
 g2vbConnector PlaceVertOnEdge(v2gConnector input, int edgeNum)
-{
+{ 
+    // get field strengths (via a linear combination of the 8 corner strengths)
+    // @ the two corners that this edge connects, then find how far along 
+    // that edge the strength value hits zero.
     // Along this cell edge, where does the density value hit zero?
     float str0 = dot(cornerAmask0123[edgeNum], input.field0123) + dot(cornerAmask4567[edgeNum], input.field4567);
     float str1 = dot(cornerBmask0123[edgeNum], input.field0123) + dot(cornerBmask4567[edgeNum], input.field4567);
-    float t = saturate(str0 / (str0 - str1)); //0..1
+    float t = saturate(str0 / (str0 - str1)); //0..1 // 'saturate' keeps occasional crazy stray triangle from appearing @ edges
 
-    // use that to get wsCoordand uvwcoords
+    // use that to get wsCoord and uvw coords
     float3 pos_within_cell = vec_start[edgeNum] + t * vec_dir[edgeNum]; //[0..1]
     float3 wsCoord = input.wsCoord.xyz + pos_within_cell.xyz * wsVoxelSize;
+    /**cascades demo uses:
+    wsCoord.xz = input.wsCoord.xz + pos_within_cell.xz*wsVoxelSize.xx;
+    wsCoord.y = lerp(input.wsCoord.y, input.wsCoord.w, pos_within_cell.y);
+    */
     float3 uvw = input.uvw_3dtex + (pos_within_cell * inv_voxelDimMinusOne.xyz).xzy;
 
     g2vbConnector output;
