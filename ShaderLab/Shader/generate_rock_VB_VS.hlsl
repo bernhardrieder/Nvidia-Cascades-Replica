@@ -18,12 +18,12 @@ struct v2gConnector
 //Texture3D tex; // our volume of density values. (+=rock, -=air)
 //SamplerState s; // trilinearinterpolation; clamps on XY, wraps on Z.
 
-//cbuffer SliceInfos
-//{
-//    // Updated each frame. To generate 5 slices this frame,
-//    // app has to put their world-space Y coordsin slots [0..4] here.
-//    float slice_world_space_Y_coord[256];
-//}
+cbuffer SliceInfos
+{
+    // Updated each frame. To generate 5 slices this frame,
+    // app has to put their world-space Y coordsin slots [0..4] here.
+    float slice_world_space_Y_coord[256];
+}
 
 //// converts a point in world space to 3D texture space (for sampling the 3D texture):
 //#define WS_to_UVW(ws) (float3(ws.xz*0.5+0.5, ws.y*WorldSpaceVolumeHeight).xzy)

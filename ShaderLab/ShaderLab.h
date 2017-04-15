@@ -2,6 +2,7 @@
 #include "stdafx.h"
 #include "Camera.h"
 #include <CommonStates.h>
+#include "RockVertexBufferGenerator.h"
 
 using namespace DirectX;
 
@@ -112,9 +113,9 @@ private:
 	bool m_isDensityTextureCreated = false;
 	ID3D11InputLayout* m_inputLayoutDensityVS = nullptr;
 	ID3D11Buffer* m_renderPortalvertexBuffer = nullptr;
-	ID3D11VertexShader* m_densityVS;
-	ID3D11GeometryShader* m_densityGS;
-	ID3D11PixelShader* m_densityPS;
+	ID3D11VertexShader* m_densityVS = nullptr;
+	ID3D11GeometryShader* m_densityGS = nullptr;
+	ID3D11PixelShader* m_densityPS = nullptr;
 
 	const size_t m_noiseTexCount = 8;
 	std::unique_ptr<CommonStates> m_commonStates;
@@ -122,4 +123,7 @@ private:
 	const std::wstring m_noiseTexPrefix = L"Textures/Noise/";
 	const std::wstring m_noiseTexFilename[8] = {	L"lichen1_disp.dds", L"lichen2_disp.dds", L"lichen3_disp.dds", L"lichen4_disp.dds",  
 													L"lichen5_disp.dds", L"lichen6_disp.dds", L"lichen7_disp.dds", L"lichen8_disp.dds" };
+
+	bool m_isRockVertexBufferGenerated = false;
+	RockVertexBufferGenerator m_rockVBGenerator;
 };

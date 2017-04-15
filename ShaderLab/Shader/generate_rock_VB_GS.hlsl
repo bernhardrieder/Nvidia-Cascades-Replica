@@ -58,6 +58,9 @@ g2vbConnector PlaceVertOnEdge(v2gConnector input, int edgeNum)
     output.wsCoord_Ambo.xyz = wsCoord;
     //output.wsCoord_Ambo.w = grad_ambo_tex.SampleLevel(s, uvw, 0).w;
     //output.wsNormal = ComputeNormal(tex, s, uvw);
+
+    output.wsCoord_Ambo.w = 0.f; //DUMMY
+    output.wsNormal = 0.f; // DUMMY
     return output;
 }
 
