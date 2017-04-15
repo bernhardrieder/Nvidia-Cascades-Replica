@@ -79,7 +79,7 @@ float main(g2pConnector input) : SV_TARGET
     //shelves (slide 17)
     density += cos(input.pos.z);
 
-    float x = turbulence(input.pos.xyz,1) * 5.56f;
+    float x = turbulence(input.pos.xyz, 1) * 5.56f;
     //float4x4 rotation = float4x4(
     //                        float4(cos(x),-sin(x),0,0),
     //                        float4(sin(x), cos(x), 0, 0),

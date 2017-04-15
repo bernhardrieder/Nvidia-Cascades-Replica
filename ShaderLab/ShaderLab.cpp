@@ -37,6 +37,8 @@ bool ShaderLab::Initialize()
 		MessageBox(nullptr, TEXT("Failed to load textures."), TEXT("Error"), MB_OK);
 		return false;
 	}
+	if (!m_rockVBGenerator.Initialize(m_device))
+		return false;
 
 
 	m_commonStates = std::make_unique<CommonStates>(m_device);
@@ -70,6 +72,12 @@ void ShaderLab::render(float deltaTime)
 
 	if (!m_isDensityTextureCreated)
 		fillDensityTexture();
+
+	if (!m_isRockVertexBufferGenerated)
+	{
+		m_rockVBGenerator.GenerateVertexBuffer(m_deviceContext, m_densityTex3D_SRV);
+		m_isRockVertexBufferGenerated = true;
+	}
 
 	/** SAMPLE CODE */
 	//Clear!
