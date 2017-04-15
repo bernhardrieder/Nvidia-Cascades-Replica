@@ -12,12 +12,19 @@ public:
 private:
 	bool loadShaders(ID3D11Device* device);
 	bool loadConstantBuffers(ID3D11Device* device);
+	bool loadVertexBuffer(ID3D11Device* device);
 	void unloadConstantBuffers();
 	void unloadShaders();
+	void unloadVertexBuffer();
 
 	struct VertexShaderInput
 	{
 		DirectX::XMFLOAT2 UV;
+	};
+	struct GeometryShaderOutput
+	{
+		DirectX::XMFLOAT4 wsCoord_Ambo;
+		DirectX::XMFLOAT3 wsNormal;
 	};
 	enum ShaderConstanBufferType
 	{

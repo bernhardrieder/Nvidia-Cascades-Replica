@@ -10,6 +10,7 @@ RockVertexBufferGenerator::~RockVertexBufferGenerator()
 {
 	unloadShaders();
 	unloadConstantBuffers();
+	unloadVertexBuffer();
 }
 
 bool RockVertexBufferGenerator::Initialize(ID3D11Device* device)
@@ -24,7 +25,11 @@ bool RockVertexBufferGenerator::Initialize(ID3D11Device* device)
 		MessageBox(nullptr, TEXT("RockVertexBufferGenerator: Failed to load constant buffers!"), TEXT("Error"), MB_OK);
 		return false;
 	}
-
+	if(!loadVertexBuffer(device))
+	{
+		MessageBox(nullptr, TEXT("RockVertexBufferGenerator: Failed to load buffers!"), TEXT("Error"), MB_OK);
+		return false;
+	}
 	m_commonStates = std::make_unique<CommonStates>(device);
 
 	return true;
@@ -34,6 +39,10 @@ bool RockVertexBufferGenerator::Generate(ID3D11DeviceContext* deviceContext, ID3
 {
 	//TODO: do stuff
 
+
+
+	UINT offset[1] = { 0 };
+	deviceContext->SOSetTargets(1, &m_vertexBuffer, offset);
 	//m_isVBGenerated = true;
 	return true;
 }
@@ -57,7 +66,20 @@ bool RockVertexBufferGenerator::loadShaders(ID3D11Device* device)
 	HR_VS = device->CreateVertexShader(vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), nullptr, &m_vertexShader);
 	
 	//TODO: create GS with SO
-	HR_GS = device->CreateGeometryShader(gsBlob->GetBufferPointer(), gsBlob->GetBufferSize(), nullptr, &m_geometryShader);
+	//D3D11_SO_DECLARATION_ENTRY pDecl[] =
+	//{
+	//	// semantic name, semantic index, start component, component count, output slot
+	//	{ 0, "SV_POSITION", 0, 0, 4, 0 },   // output all components of position
+	//	{ 0, "TEXCOORD0", 0, 0, 3, 0 },     // output the first 3 of the normal
+	//	{ 0, "TEXCOORD1", 0, 0, 2, 0 }     // output the first 2 texture coordinates
+	//};
+	D3D11_SO_DECLARATION_ENTRY pDecl[] =
+	{
+		// semantic name, semantic index, start component, component count, output slot
+		{ 0, "POSITION", 0, 0, 4, 0 },   
+		{ 0, "NORMAL", 0, 0, 3, 0 }
+	};
+	HR_GS = device->CreateGeometryShaderWithStreamOutput(gsBlob->GetBufferPointer(), gsBlob->GetBufferSize(), pDecl, sizeof(pDecl), NULL, 0, 0, NULL, &m_geometryShader);
 
 	if (FAILED(HR_VS) || FAILED(HR_GS))
 		return false;
@@ -113,9 +135,32 @@ bool RockVertexBufferGenerator::loadConstantBuffers(ID3D11Device* device)
 	return true;
 }
 
-void RockVertexBufferGenerator::unloadConstantBuffers()
+bool RockVertexBufferGenerator::loadVertexBuffer(ID3D11Device* device)
+{
+	// Create an initialize the vertex buffer.
+	D3D11_BUFFER_DESC vertexBufferDesc;
+	ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
+	vertexBufferDesc.BindFlags = D3D11_BIND_STREAM_OUTPUT;
+	//TODO: check and set right num of outputs!
+	vertexBufferDesc.ByteWidth = sizeof(GeometryShaderOutput) * 10000;
+	vertexBufferDesc.CPUAccessFlags = 0;
+	vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+
+	HRESULT hr = device->CreateBuffer(&vertexBufferDesc, NULL, &m_vertexBuffer);
+
+	if (FAILED(hr))
+		return false;
+
+	return true;
+}
+
+void RockVertexBufferGenerator::unloadVertexBuffer()
 {
 	SafeRelease(m_vertexBuffer);
+}
+
+void RockVertexBufferGenerator::unloadConstantBuffers()
+{
 	for (auto a : m_constantBuffers)
 		SafeRelease(a);
 }
