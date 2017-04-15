@@ -12,7 +12,7 @@ RockVertexBufferGenerator::~RockVertexBufferGenerator()
 	unloadConstantBuffers();
 }
 
-bool RockVertexBufferGenerator::Initialize(ID3D11Device*& device)
+bool RockVertexBufferGenerator::Initialize(ID3D11Device* device)
 {
 	if (!loadShaders(device))
 	{
@@ -30,26 +30,26 @@ bool RockVertexBufferGenerator::Initialize(ID3D11Device*& device)
 	return true;
 }
 
-ID3D11Buffer const* RockVertexBufferGenerator::GenerateVertexBuffer(ID3D11DeviceContext*& deviceContext, ID3D11ShaderResourceView*& densityTexture3D) const
+bool RockVertexBufferGenerator::Generate(ID3D11DeviceContext* deviceContext, ID3D11ShaderResourceView* densityTexture3D) const
 {
 	//TODO: do stuff
 
 	//m_isVBGenerated = true;
-	return GetVertexBuffer();
+	return true;
 }
 
-ID3D11Buffer const* RockVertexBufferGenerator::GetVertexBuffer() const
+ID3D11Buffer* RockVertexBufferGenerator::GetVertexBuffer() const
 {
 	return m_vertexBuffer;
 }
 
-bool RockVertexBufferGenerator::loadShaders(ID3D11Device*& device)
+bool RockVertexBufferGenerator::loadShaders(ID3D11Device* device)
 {
 	ID3DBlob *vsBlob, *gsBlob;
 
 	HRESULT HR_VS, HR_GS;
-	HR_VS = D3DReadFileToBlob(m_vsFilename, &vsBlob);
-	HR_GS = D3DReadFileToBlob(m_gsFilename, &gsBlob);
+	HR_VS = D3DReadFileToBlob(m_compiledVSPath, &vsBlob);
+	HR_GS = D3DReadFileToBlob(m_compiledGSPath, &gsBlob);
 
 	if (FAILED(HR_VS) || FAILED(HR_GS))
 		return false;
@@ -77,7 +77,7 @@ bool RockVertexBufferGenerator::loadShaders(ID3D11Device*& device)
 	return true;
 }
 
-bool RockVertexBufferGenerator::loadConstantBuffers(ID3D11Device*& device)
+bool RockVertexBufferGenerator::loadConstantBuffers(ID3D11Device* device)
 {
 	CB_MC_LUT_1 mcLut1Data;
 	//TODO: fill data

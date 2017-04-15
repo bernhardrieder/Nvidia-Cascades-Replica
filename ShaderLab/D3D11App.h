@@ -17,6 +17,8 @@ public:
 	int Run();
 	virtual LRESULT MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 	float AspectRatio() const;
+	void SetViewportDimensions(FLOAT width, FLOAT height);
+	D3D11_VIEWPORT const* GetViewport() const;
 
 protected:
 	//called in Gameloop by Run()
@@ -33,7 +35,6 @@ protected:
 	ATOM registerWin32Class(HINSTANCE hInstance);
 	virtual bool initDirectX();
 
-	void setViewportDimensions(FLOAT width, FLOAT height);
 	static DXGI_RATIONAL QueryRefreshRate(UINT screenWidth, UINT screenHeight, BOOL vsync);
 
 protected:

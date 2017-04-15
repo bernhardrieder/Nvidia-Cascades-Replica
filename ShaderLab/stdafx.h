@@ -54,6 +54,7 @@ inline void SafeRelease(T& ptr)
 #include "ShaderLab.h"
 #include "Camera.h"
 #include "RockVertexBufferGenerator.h"
+#include "Density3DTextureGenerator.h"
 
 //directx toolkit
 #include "CommonStates.h"
