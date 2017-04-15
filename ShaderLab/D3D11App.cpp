@@ -162,7 +162,7 @@ void D3D11App::onResize()
 	m_device->CreateDepthStencilView(m_depthStencilBuffer, 0, &m_depthStencilView);
 
 	// Initialize the viewport to occupy the entire client area.
-	setViewportDimensions(static_cast<FLOAT>(m_windowWidth), static_cast<FLOAT>(m_windowHeight));
+	SetViewportDimensions(static_cast<FLOAT>(m_windowWidth), static_cast<FLOAT>(m_windowHeight));
 }
 
 bool D3D11App::initDirectX()
@@ -292,12 +292,12 @@ bool D3D11App::initDirectX()
 		return false;
 
 	// Initialize the viewport to occupy the entire client area.
-	setViewportDimensions(static_cast<FLOAT>(m_windowWidth), static_cast<FLOAT>(m_windowHeight));
+	SetViewportDimensions(static_cast<FLOAT>(m_windowWidth), static_cast<FLOAT>(m_windowHeight));
 
 	return true;
 }
 
-void D3D11App::setViewportDimensions(FLOAT width, FLOAT height)
+void D3D11App::SetViewportDimensions(FLOAT width, FLOAT height)
 {
 	m_viewport.Width = width;
 	m_viewport.Height = height;
@@ -305,6 +305,11 @@ void D3D11App::setViewportDimensions(FLOAT width, FLOAT height)
 	m_viewport.TopLeftY = 0.0f;
 	m_viewport.MinDepth = 0.0f;
 	m_viewport.MaxDepth = 1.0f;
+}
+
+D3D11_VIEWPORT const* D3D11App::GetViewport() const
+{
+	return &m_viewport;
 }
 
 ATOM D3D11App::registerWin32Class(HINSTANCE hInstance)

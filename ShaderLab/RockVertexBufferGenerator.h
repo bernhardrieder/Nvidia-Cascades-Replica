@@ -6,10 +6,15 @@ public:
 	RockVertexBufferGenerator();
 	~RockVertexBufferGenerator();
 
-	bool Initialize(ID3D11Device*& device);
-	ID3D11Buffer const* GenerateVertexBuffer(ID3D11DeviceContext*& pDeviceContext, ID3D11ShaderResourceView*& pDensityTexture3DShaderResourceView) const;
-	ID3D11Buffer const* GetVertexBuffer() const;
+	bool Initialize(ID3D11Device* device);
+	bool Generate(ID3D11DeviceContext* pDeviceContext, ID3D11ShaderResourceView* pDensityTexture3DShaderResourceView) const;
+	ID3D11Buffer* GetVertexBuffer() const;
 private:
+	bool loadShaders(ID3D11Device* device);
+	bool loadConstantBuffers(ID3D11Device* device);
+	void unloadConstantBuffers();
+	void unloadShaders();
+
 	struct VertexShaderInput
 	{
 		DirectX::XMFLOAT2 UV;
@@ -48,16 +53,12 @@ private:
 	std::unique_ptr<DirectX::CommonStates> m_commonStates = nullptr;
 
 #if _DEBUG
-	const wchar_t* m_vsFilename = L"Shader/generate_rock_VB_VS_d.cso";
-	const wchar_t* m_gsFilename = L"Shader/generate_rock_VB_GS_d.cso";
+	const wchar_t* m_compiledVSPath = L"Shader/generate_rock_VB_VS_d.cso";
+	const wchar_t* m_compiledGSPath = L"Shader/generate_rock_VB_GS_d.cso";
 #else
-	const wchar_t* m_vsFilename = L"Shader/generate_rock_VB_VS.cso";
-	const wchar_t* m_gsFilename = L"Shader/generate_rock_VB_GS.cso";
+	const wchar_t* m_compiledVSPath = L"Shader/generate_rock_VB_VS.cso";
+	const wchar_t* m_compiledGSPath = L"Shader/generate_rock_VB_GS.cso";
 #endif
 
-	bool loadShaders(ID3D11Device*& device);
-	bool loadConstantBuffers(ID3D11Device*& device);
-	void unloadConstantBuffers();
-	void unloadShaders();
 };
 

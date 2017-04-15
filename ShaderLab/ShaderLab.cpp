@@ -15,7 +15,6 @@ ShaderLab::~ShaderLab()
 	ShaderLab::cleanup();
 	unloadBuffers();
 	unloadShaders();
-	unloadTextures();
 }
 
 bool ShaderLab::Initialize()
@@ -32,11 +31,8 @@ bool ShaderLab::Initialize()
 		MessageBox(nullptr, TEXT("Failed to load shaders."), TEXT("Error"), MB_OK);
 		return false;
 	}
-	if(!loadTextures())	
-	{
-		MessageBox(nullptr, TEXT("Failed to load textures."), TEXT("Error"), MB_OK);
+	if (!m_densityTexGenerator.Initialize(m_device))
 		return false;
-	}
 	if (!m_rockVBGenerator.Initialize(m_device))
 		return false;
 
@@ -70,14 +66,10 @@ void ShaderLab::render(float deltaTime)
 	assert(m_device);
 	assert(m_deviceContext);
 
-	if (!m_isDensityTextureCreated)
-		fillDensityTexture();
-
-	if (!m_isRockVertexBufferGenerated)
-	{
-		m_rockVBGenerator.GenerateVertexBuffer(m_deviceContext, m_densityTex3D_SRV);
-		m_isRockVertexBufferGenerated = true;
-	}
+	if (!m_isDensityTextureGenerated)
+		m_isDensityTextureGenerated = m_densityTexGenerator.Generate(m_deviceContext);
+	if (m_isDensityTextureGenerated && !m_isRockVertexBufferGenerated)
+		m_isRockVertexBufferGenerated = m_rockVBGenerator.Generate(m_deviceContext, m_densityTexGenerator.GetTexture3DShaderResourceView());
 
 	/** SAMPLE CODE */
 	//Clear!
@@ -96,7 +88,8 @@ void ShaderLab::render(float deltaTime)
 	m_deviceContext->VSSetConstantBuffers(0, 3, m_constantBuffers);
 
 	m_deviceContext->GSSetShader(m_simpleGS, nullptr, 0);
-	m_deviceContext->GSSetShaderResources(0, 1, &m_densityTex3D_SRV);
+	auto densSRV = m_densityTexGenerator.GetTexture3DShaderResourceView();
+	m_deviceContext->GSSetShaderResources(0, 1, &densSRV);
 	auto samplerState = m_commonStates->LinearWrap();
 	m_deviceContext->GSSetSamplers(0, 1, &samplerState);
 
@@ -105,7 +98,7 @@ void ShaderLab::render(float deltaTime)
 
 	m_deviceContext->PSSetShader(m_simplePS, nullptr, 0);
 
-	//m_deviceContext->OMSetRenderTargets(1, &m_densityTex3D_RTV, m_depthStencilView);
+	//m_deviceContext->OMSetRenderTargets(1, &m_tex3D_RTV, m_depthStencilView);
 	m_deviceContext->OMSetRenderTargets(1, &m_renderTargetView, m_depthStencilView);
 	m_deviceContext->OMSetDepthStencilState(m_depthStencilState, 1);
 
@@ -249,10 +242,6 @@ bool ShaderLab::loadShaders()
 		return false;
 
 	SafeRelease(geometryShaderBlob);
-
-	if (!loadDensityFunctionShaders())
-		return false;
-
 	return true;
 }
 
@@ -330,188 +319,10 @@ bool ShaderLab::initDirectX()
 	if (!D3D11App::initDirectX())
 		return false;
 
-	D3D11_TEXTURE3D_DESC texDesc;
-	ZeroMemory(&texDesc, sizeof(D3D11_TEXTURE3D_DESC));
-	texDesc.Width = 96; // x axis
-	texDesc.Height = 96; // y axis
-	texDesc.Depth = 256; // z axis
-	texDesc.MipLevels = 1;
-	texDesc.Format = DXGI_FORMAT_R16_FLOAT;
-	texDesc.Usage = D3D11_USAGE_DEFAULT;
-	texDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
-	//texDesc.CPUAccessFlags = 0;
-	//texDesc.MiscFlags = 0;
-	//
-	//texDesc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
-
-	HRESULT hr = m_device->CreateTexture3D(&texDesc, nullptr, &m_densityTex3D);
-	if (FAILED(hr))
-		return false;
-
-	// Give the buffer a useful name
-	//m_densityTex3D->SetPrivateData(WKPDID_D3DDebugObjectName, sizeof("Density Texture"), "Density Texture");
-
-	D3D11_RENDER_TARGET_VIEW_DESC rtvDesc;
-	ZeroMemory(&rtvDesc, sizeof(D3D11_RENDER_TARGET_VIEW_DESC));
-	rtvDesc.Format = texDesc.Format;
-	rtvDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE3D;
-
-	hr = m_device->CreateRenderTargetView(m_densityTex3D, nullptr, &m_densityTex3D_RTV);
-	if (FAILED(hr))
-		return false;
-
-	D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
-	ZeroMemory(&srvDesc, sizeof(D3D11_SHADER_RESOURCE_VIEW_DESC));
-	srvDesc.Format = texDesc.Format;
-	srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE3D;
-	srvDesc.Texture3D.MipLevels = texDesc.MipLevels;
-	srvDesc.Texture3D.MostDetailedMip = 0;
-
-	hr = m_device->CreateShaderResourceView(m_densityTex3D, &srvDesc, &m_densityTex3D_SRV);
-	if (FAILED(hr))
-		return false;
-
 	return true;
 }
 
 void ShaderLab::cleanup()
 {
 	D3D11App::cleanup();
-	SafeRelease(m_densityTex3D);
-	SafeRelease(m_densityTex3D_RTV);
-	SafeRelease(m_densityTex3D_SRV);
-}
-
-void ShaderLab::fillDensityTexture()
-{
-	setViewportDimensions(96, 96);
-	m_deviceContext->ClearRenderTargetView(m_densityTex3D_RTV, Colors::White);
-	//m_deviceContext->ClearDepthStencilView(m_depthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
-
-	const UINT vertexStride = sizeof(VertexPos);
-	const UINT offset = 0;
-
-	m_deviceContext->IASetInputLayout(m_inputLayoutDensityVS);
-	m_deviceContext->IASetVertexBuffers(0, 1, &m_renderPortalvertexBuffer, &vertexStride, &offset);
-	m_deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-
-	m_deviceContext->VSSetShader(m_densityVS, nullptr, 0);
-	//m_deviceContext->VSSetConstantBuffers(0, 3, m_constantBuffers);
-
-	m_deviceContext->GSSetShader(m_densityGS, nullptr, 0);
-
-	//rasterizer
-	m_deviceContext->RSSetState(m_rasterizerState);
-	m_deviceContext->RSSetViewports(1, &m_viewport);
-
-	m_deviceContext->PSSetShader(m_densityPS, nullptr, 0);
-	m_deviceContext->PSSetShaderResources(0, m_noiseTexCount, m_noiseTexSRV );
-	
-	auto samplerState = m_commonStates->LinearWrap();
-	m_deviceContext->PSSetSamplers(0, 1, &samplerState);
-
-	//output merger
-	m_deviceContext->OMSetRenderTargets(1, &m_densityTex3D_RTV, nullptr);
-	//m_deviceContext->OMSetDepthStencilState(m_depthStencilState, 1);
-
-	m_deviceContext->DrawInstanced(6, 256, 0, 0);
-	//m_swapChain->Present(0, 0);
-
-
-	/** RESET */
-	//reset render target - otherwise the density SRV can't be used
-	m_deviceContext->OMSetRenderTargets(0, nullptr, nullptr);
-
-	//release density rtv?
-
-	setViewportDimensions(static_cast<FLOAT>(m_windowWidth), static_cast<FLOAT>(m_windowHeight));
-	m_isDensityTextureCreated = true;
-}
-
-bool ShaderLab::loadDensityFunctionShaders()
-{
-	ID3DBlob *vsBlob, *gsBlob, *psBlob;
-
-#if _DEBUG
-	LPCWSTR compiledVS = L"Shader/create_density_tex3d_VS_d.cso";
-	LPCWSTR compiledGS = L"Shader/create_density_tex3d_GS_d.cso";
-	LPCWSTR compilesPS = L"Shader/create_density_tex3d_PS_d.cso";
-#else
-	LPCWSTR compiledVS = L"Shader/create_density_tex3d_VS.cso";
-	LPCWSTR compiledGS = L"Shader/create_density_tex3d_GS.cso";
-	LPCWSTR compilesPS = L"Shader/create_density_tex3d_PS.cso";
-#endif
-
-	HRESULT HR_VS, HR_GS, HR_PS;
-	HR_VS = D3DReadFileToBlob(compiledVS, &vsBlob);
-	HR_GS = D3DReadFileToBlob(compiledGS, &gsBlob);
-	HR_PS = D3DReadFileToBlob(compilesPS, &psBlob);
-
-	if (FAILED(HR_VS) || FAILED(HR_GS) || FAILED(HR_PS))
-		return false;
-
-	HR_VS = m_device->CreateVertexShader(vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), nullptr, &m_densityVS);
-	HR_GS = m_device->CreateGeometryShader(gsBlob->GetBufferPointer(), gsBlob->GetBufferSize(), nullptr, &m_densityGS);
-	HR_PS = m_device->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, &m_densityPS);
-
-	if (FAILED(HR_VS) || FAILED(HR_GS) || FAILED(HR_PS))
-		return false;
-
-	// Create the input layout for the vertex shader.
-	D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
-	{
-		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(VertexPos,Position), D3D11_INPUT_PER_VERTEX_DATA, 0 }
-		//{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, offsetof(VertexPosColor,Color), D3D11_INPUT_PER_VERTEX_DATA, 0 }
-	};
-
-	HR_VS = m_device->CreateInputLayout(vertexLayoutDesc, _countof(vertexLayoutDesc), vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), &m_inputLayoutDensityVS);
-	if (FAILED(HR_VS))
-		return false;
-
-	SafeRelease(vsBlob);
-	SafeRelease(gsBlob);
-	SafeRelease(psBlob);
-
-
-	// Create an initialize the vertex buffer.
-	D3D11_BUFFER_DESC vertexBufferDesc;
-	ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
-	vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-	vertexBufferDesc.ByteWidth = sizeof(VertexPos) * _countof(m_renderPortalVertices);
-	vertexBufferDesc.CPUAccessFlags = 0;
-	vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-
-	D3D11_SUBRESOURCE_DATA resourceData;
-	ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
-	resourceData.pSysMem = m_renderPortalVertices;
-
-	HRESULT hr = m_device->CreateBuffer(&vertexBufferDesc, &resourceData, &m_renderPortalvertexBuffer);
-	if (FAILED(hr))
-		return false;
-
-	return true;
-}
-
-bool ShaderLab::loadTextures()
-{
-	for(int i = 0; i < m_noiseTexCount; ++i)
-	{
-		// Load the texture in.
-		auto filename = (m_noiseTexPrefix + m_noiseTexFilename[i]);
-		HRESULT hr = CreateDDSTextureFromFile(m_device, filename.c_str(), nullptr, &m_noiseTexSRV[i]);
-
-		if (FAILED(hr))
-			return false;
-	}
-	
-	return true;
-}
-
-void ShaderLab::unloadTextures()
-{
-	for (int i = 0; i < m_noiseTexCount; ++i)
-	{
-		SafeRelease(m_noiseTexSRV[i]);
-	}
 }
