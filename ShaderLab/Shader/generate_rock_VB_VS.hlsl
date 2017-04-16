@@ -2,7 +2,7 @@
 
 struct a2vConnector
 {
-    float2 uv : POSITION; // 0..1 range
+    float3 uv : Position; // 0..1 range
     uint nInstanceID: SV_InstanceID;
 };
 
@@ -18,11 +18,11 @@ struct v2gConnector
 Texture3D tex; // our volume of density values. (+=rock, -=air)
 SamplerState s; // trilinearinterpolation; clamps on XY, wraps on Z.
 
-cbuffer SliceInfos
+cbuffer SliceInfos : register (b0)
 {
     // Updated each frame. To generate 5 slices this frame,
     // app has to put their world-space Y coords in slots [0..4] here.
-    float slice_world_space_Y_coord[256];
+    float4 slice_world_space_Y_coord[256];
 }
 
 // converts a point in world space to 3D texture space (for sampling the 3D texture):
@@ -33,12 +33,13 @@ v2gConnector main(a2vConnector a2v)
     // get world-space coordinates & UVW coords of lower-left corner of this cell
     float3 wsCoord;
     wsCoord.xz = a2v.uv.xy * 2 - 1;
-    wsCoord.y = slice_world_space_Y_coord[a2v.nInstanceID];
-    float3 uvw = WS_to_UVW(wsCoord);
+    wsCoord.y = slice_world_space_Y_coord[a2v.nInstanceID].y;
+    //float3 uvw = WS_to_UVW(wsCoord);
+    float3 uvw = float3(a2v.uv.x, a2v.uv.y, wsCoord.y * WorldSpaceVolumeHeight);
 
     // sample the 3D texture to get the density values at the 8 corners
-    //float2 step = float2(wsVoxelSize.x, 0); // so used in cascade secrets shader code
-    float2 step = float2(inv_voxelDimMinusOne.x, 0); // inv_voxelDimMinusOne used in cascade shader code ==> makes more sense?!
+    float2 step = float2(wsVoxelSize.x, 0); // so used in cascade secrets shader code
+    //float2 step = float2(inv_voxelDimMinusOne.x, 0); // inv_voxelDimMinusOne used in cascade shader code ==> makes more sense?!
     //TODO: MAYBE CHANGE STEP!!
     float4 f0123 = float4(  tex.SampleLevel(s, uvw + step.yyy, 0).x,
                             tex.SampleLevel(s, uvw + step.yyx, 0).x,

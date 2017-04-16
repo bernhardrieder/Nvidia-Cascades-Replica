@@ -1,8 +1,9 @@
+
 #include "generate_rock_globals.hlsli"
 
 struct v2gConnector
 {
-    float4 wsCoord : POSITION; //coords are for the LOWER-LEFT corner of the cell.
+    float3 wsCoord : POSITION; //coords are for the LOWER-LEFT corner of the cell.
     float3 uvw_3dtex : TEX; //coords are for the LOWER-LEFT corner of the cell.
     float4 field0123 : TEX1; // the density values
     float4 field4567 : TEX2; // at the corners
@@ -17,22 +18,21 @@ struct g2vbConnector
     float3 wsNormal : NORMAL;
 };
 
-cbuffer g_mc_lut1
+cbuffer g_mc_lut1 : register(b0)
 {
-    uint case_to_numpolys[256];
+    int4 case_to_numpolys[256];
     float4 cornerAmask0123[12];
     float4 cornerAmask4567[12];
     float4 cornerBmask0123[12];
     float4 cornerBmask4567[12];
-    float3 vec_start[12];
-    float3 vec_dir[12];
+    float4 vec_start[12];
+    float4 vec_dir[12];
 };
 
-cbuffer g_mc_lut2
+cbuffer g_mc_lut2 : register(b1)
 {
     int4 g_triTable[1280]; // 256*5 = 1280  (256 cases; up to 15 (0/3/6/9/12/15) verts output for each.)
 };
-
 // our volume of density values.
 Texture3D tex;
 // trilinearinterp; clamps on XY, wraps on Z.
@@ -62,7 +62,7 @@ g2vbConnector PlaceVertOnEdge(v2gConnector input, int edgeNum)
     float t = saturate(str0 / (str0 - str1)); //0..1 // 'saturate' keeps occasional crazy stray triangle from appearing @ edges
 
     // use that to get wsCoord and uvw coords
-    float3 pos_within_cell = vec_start[edgeNum] + t * vec_dir[edgeNum]; //[0..1]
+    float3 pos_within_cell = vec_start[edgeNum].xyz + t * vec_dir[edgeNum].xyz; //[0..1]
     float3 wsCoord = input.wsCoord.xyz + pos_within_cell.xyz * wsVoxelSize;
     /**cascades demo uses:
     wsCoord.xz = input.wsCoord.xz + pos_within_cell.xz*wsVoxelSize.xx;
@@ -84,7 +84,7 @@ g2vbConnector PlaceVertOnEdge(v2gConnector input, int edgeNum)
 void main(point v2gConnector input[1], inout TriangleStream<g2vbConnector> outStream)
 {
     g2vbConnector output;
-    uint num_polys = case_to_numpolys[input[0].mc_case];
+    uint num_polys = case_to_numpolys[input[0].mc_case].x;
     uint table_pos = input[0].mc_case * 5;
     for (uint p = 0; p < num_polys; p++)
     {

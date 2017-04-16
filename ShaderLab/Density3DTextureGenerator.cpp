@@ -73,6 +73,9 @@ bool Density3DTextureGenerator::Generate(ID3D11DeviceContext* deviceContext)
 
 
 	/** RESET */
+	deviceContext->VSSetShader(nullptr, nullptr, 0);
+	deviceContext->GSSetShader(nullptr, nullptr, 0);
+	deviceContext->PSSetShader(nullptr, nullptr, 0);
 	//reset render target - otherwise the density SRV can't be used
 	deviceContext->OMSetRenderTargets(0, nullptr, nullptr);
 	//release density rtv?
@@ -107,7 +110,7 @@ bool Density3DTextureGenerator::loadID3D11Resources(ID3D11Device* device)
 	ZeroMemory(&rtvDesc, sizeof(D3D11_RENDER_TARGET_VIEW_DESC));
 	rtvDesc.Format = texDesc.Format;
 	rtvDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE3D;
-
+	
 	hr = device->CreateRenderTargetView(m_tex3D, nullptr, &m_tex3D_RTV);
 	if (FAILED(hr))
 		return false;
