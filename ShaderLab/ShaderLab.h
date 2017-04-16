@@ -43,10 +43,10 @@ private:
 	};
 
 	// Vertex data for a colored cube.
-	struct VertexPosColor
+	struct VertexPosNormal
 	{
 		XMFLOAT3 Position;
-		XMFLOAT3 Color;
+		XMFLOAT3 Normal;
 	};
 
 	// Vertex buffer data
@@ -54,7 +54,7 @@ private:
 	ID3D11Buffer* m_vertexBuffer = nullptr;
 	ID3D11Buffer* m_indexBuffer = nullptr;
 
-	VertexPosColor m_vertices[8] =
+	VertexPosNormal m_vertices[8] =
 	{
 		{ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT3(0.0f, 0.0f, 0.0f) }, // 0
 		{ XMFLOAT3(-1.0f,  1.0f, -1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) }, // 1

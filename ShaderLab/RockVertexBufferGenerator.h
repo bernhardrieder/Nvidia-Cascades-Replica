@@ -58,7 +58,7 @@ private:
 		DirectX::XMFLOAT4 slice_world_space_Y_coord[256];
 	};
 
-	uint32_t m_maxRenderedSlices = 5;
+	uint32_t m_maxRenderedSlices = 50;
 	ID3D11Buffer* m_constantBuffers[NumConstantBuffers];
 	ID3D11VertexShader* m_vertexShader = nullptr;
 	ID3D11InputLayout* m_vsInputLayout = nullptr;

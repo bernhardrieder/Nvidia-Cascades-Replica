@@ -54,8 +54,10 @@ bool RockVertexBufferGenerator::Generate(ID3D11DeviceContext* deviceContext, ID3
 {
 	//TODO: check if this is the proper way to handle this!? ==> should be updated every frame?!
 	CB_SliceInfo cb;
+	float step = 1.f / 256.f;
+
 	for (int i = 0; i < 256; ++i)
-		cb.slice_world_space_Y_coord[i] = { 0.f, static_cast<float>(i), 0.f, 0.f };
+		cb.slice_world_space_Y_coord[i] = { 0.f, step*i*100, 0.f, 0.f };
 	deviceContext->UpdateSubresource(m_constantBuffers[SliceInfos], 0, nullptr, &cb, 0, 0);
 
 
@@ -89,7 +91,7 @@ bool RockVertexBufferGenerator::Generate(ID3D11DeviceContext* deviceContext, ID3
 
 	deviceContext->PSSetShader(nullptr, nullptr, 0);
 
-	//deviceContext->SOSetTargets(1, &m_vertexBuffer, &offset);
+	deviceContext->SOSetTargets(1, &m_vertexBuffer, &offset);
 
 	deviceContext->OMSetRenderTargets(0, nullptr, nullptr);
 	deviceContext->OMSetDepthStencilState(m_depthStencilState, 0);
@@ -98,12 +100,12 @@ bool RockVertexBufferGenerator::Generate(ID3D11DeviceContext* deviceContext, ID3
 
 
 	/** RESET */
-	//deviceContext->VSSetShader(nullptr, nullptr, 0);
-	//deviceContext->GSSetShader(nullptr, nullptr, 0);
-	//deviceContext->PSSetShader(nullptr, nullptr, 0);
-	////deviceContext->OMSetRenderTargets(0, nullptr, nullptr);
-	////decouple vertexbuffer from SO
-	//deviceContext->SOSetTargets(0, nullptr, nullptr);
+	deviceContext->VSSetShader(nullptr, nullptr, 0);
+	deviceContext->GSSetShader(nullptr, nullptr, 0);
+	deviceContext->PSSetShader(nullptr, nullptr, 0);
+	//deviceContext->OMSetRenderTargets(0, nullptr, nullptr);
+	//decouple vertexbuffer from SO
+	deviceContext->SOSetTargets(0, nullptr, nullptr);
 
 	return true;
 }

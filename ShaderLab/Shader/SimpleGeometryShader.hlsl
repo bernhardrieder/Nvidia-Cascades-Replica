@@ -1,27 +1,44 @@
 #include "ShaderLab.hlsli"
 
-Texture3D g_densityTex;
-SamplerState g_samLinearWrap;
+//Texture3D g_densityTex;
+//SamplerState g_samLinearWrap;
 
-[maxvertexcount(4)]
+struct v2gConnector
+{
+    float4 color : COLOR;
+    float4 pos : POSITIONT;
+    float4 originalPos : POSITION;
+};
+
+struct g2pConnector
+{
+    float4 color : COLOR;
+    float4 pos : SV_Position;
+};
+
+[maxvertexcount(3)]
 void main(
-	triangle VertexShaderOutput input[3] /*: SV_POSITION*/,
-	inout TriangleStream< GSOutput > output
+	triangle v2gConnector input[3],
+	inout TriangleStream<g2pConnector> output
 )
 {
+    int zeroCount = 0;
 	for (uint i = 0; i < 3; i++)
 	{
-		GSOutput element;
-        element.pos = input[i].pos;
-        //element.color.xyzw = float4(0.f, 1.f, 0.f, 1.f);
-        //element.color = input[i].color;
-        element.color = g_densityTex.SampleLevel(g_samLinearWrap, element.pos.xyz, 1);
-		output.Append(element);
-	}
-    GSOutput elementNew;
-    elementNew.pos = input[2].pos + float4(0.f, 20.f, 0.f, 1.f);
-    elementNew.color = float4(1.f, 0.f, 0.f, 1.f);
-    
-    output.Append(elementNew);
-    //output.RestartStrip();
+        if (input[i].originalPos.x == 0.f && input[i].originalPos.y == 0.f && input[i].originalPos.z == 0.f)
+        {
+            ++zeroCount;
+        }
+    }
+    if(zeroCount != 3)
+    {
+        for (uint i = 0; i < 3; i++)
+        {
+            g2pConnector g2p;
+            g2p.pos = input[i].pos;
+            g2p.color = input[i].pos;
+            output.Append(g2p);
+        }
+    }
+    output.RestartStrip();
 }
