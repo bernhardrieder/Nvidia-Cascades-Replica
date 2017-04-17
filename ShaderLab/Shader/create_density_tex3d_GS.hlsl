@@ -9,7 +9,7 @@ struct g2pConnector
 {
     float4 pos : TEXCOORD;
     uint index : SV_RenderTargetArrayIndex; //This will write your vertex to a specific slice, which you can read in pixel shader too
-    float4 rsCoord : SV_POSITION; // due to f*** errors
+    float4 rsCoord : SV_POSITION; // just against error
 };
 
 [maxvertexcount(3)]

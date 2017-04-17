@@ -6,14 +6,6 @@ struct g2pConnector
     float4 rsCoord : SV_POSITION;
 };
 
-Texture2D g_noise1;
-Texture2D g_noise2;
-Texture2D g_noise3;
-Texture2D g_noise4;
-Texture2D g_noise5;
-Texture2D g_noise6;
-Texture2D g_noise7;
-Texture2D g_noise8;
 SamplerState g_samLinearWrap;
 
 #include "inoise.hlsli"
@@ -46,14 +38,6 @@ static float2 pillars[3] =
 float main(g2pConnector input) : SV_TARGET
 {    
     float density = 0.f;
-    //float distToCenter = distance(input.pos.xy, float2(0.f, 0.f));
-    ///** filled circle */
-    //if (distToCenter <= 0.1f)
-    //    density = 0.f;
-
-    ///** circle */
-    //if (distToCenter <= 0.9f && distToCenter >= 0.85f)
-    //    density = 0.f;
 
     //tweak input
     input.pos.xy *= 2.0f; // xy scaling
@@ -79,12 +63,8 @@ float main(g2pConnector input) : SV_TARGET
     //shelves (slide 17)
     density += cos(input.pos.z);
 
+    //add some random noise
     float x = turbulence(input.pos.xyz, 1) * 5.56f;
-    //float4x4 rotation = float4x4(
-    //                        float4(cos(x),-sin(x),0,0),
-    //                        float4(sin(x), cos(x), 0, 0),
-    //                        float4(0, 0, 1, 0),
-    //                        float4(0, 0, 0, 0));
     float4x4 rotation = float4x4(
                             float4(x, x, x, 0),
                             float4(x, x, x, 0),
