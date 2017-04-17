@@ -43,38 +43,38 @@ private:
 	};
 
 	// Vertex data for a colored cube.
-	struct VertexPosColor
+	struct VertexPosNormal
 	{
 		XMFLOAT3 Position;
-		XMFLOAT3 Color;
+		XMFLOAT3 Normal;
 	};
 
 	// Vertex buffer data
 	ID3D11InputLayout* m_inputLayoutSimpleVS = nullptr;
-	ID3D11Buffer* m_vertexBuffer = nullptr;
-	ID3D11Buffer* m_indexBuffer = nullptr;
+	//ID3D11Buffer* m_vertexBuffer = nullptr;
+	//ID3D11Buffer* m_indexBuffer = nullptr;
 
-	VertexPosColor m_vertices[8] =
-	{
-		{ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT3(0.0f, 0.0f, 0.0f) }, // 0
-		{ XMFLOAT3(-1.0f,  1.0f, -1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) }, // 1
-		{ XMFLOAT3(1.0f,  1.0f, -1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f) }, // 2
-		{ XMFLOAT3(1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f) }, // 3
-		{ XMFLOAT3(-1.0f, -1.0f,  1.0f), XMFLOAT3(0.0f, 0.0f, 1.0f) }, // 4
-		{ XMFLOAT3(-1.0f,  1.0f,  1.0f), XMFLOAT3(0.0f, 1.0f, 1.0f) }, // 5
-		{ XMFLOAT3(1.0f,  1.0f,  1.0f), XMFLOAT3(1.0f, 1.0f, 1.0f) }, // 6
-		{ XMFLOAT3(1.0f, -1.0f,  1.0f), XMFLOAT3(1.0f, 0.0f, 1.0f) }  // 7
-	};
+	//VertexPosNormal m_vertices[8] =
+	//{
+	//	{ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT3(0.0f, 0.0f, 0.0f) }, // 0
+	//	{ XMFLOAT3(-1.0f,  1.0f, -1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) }, // 1
+	//	{ XMFLOAT3(1.0f,  1.0f, -1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f) }, // 2
+	//	{ XMFLOAT3(1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f) }, // 3
+	//	{ XMFLOAT3(-1.0f, -1.0f,  1.0f), XMFLOAT3(0.0f, 0.0f, 1.0f) }, // 4
+	//	{ XMFLOAT3(-1.0f,  1.0f,  1.0f), XMFLOAT3(0.0f, 1.0f, 1.0f) }, // 5
+	//	{ XMFLOAT3(1.0f,  1.0f,  1.0f), XMFLOAT3(1.0f, 1.0f, 1.0f) }, // 6
+	//	{ XMFLOAT3(1.0f, -1.0f,  1.0f), XMFLOAT3(1.0f, 0.0f, 1.0f) }  // 7
+	//};
 
-	WORD m_indices[36] =
-	{
-		0, 1, 2, 0, 2, 3,
-		4, 6, 5, 4, 7, 6,
-		4, 5, 1, 4, 1, 0,
-		3, 2, 6, 3, 6, 7,
-		1, 5, 6, 1, 6, 2,
-		4, 0, 3, 4, 3, 7
-	};
+	//WORD m_indices[36] =
+	//{
+	//	0, 1, 2, 0, 2, 3,
+	//	4, 6, 5, 4, 7, 6,
+	//	4, 5, 1, 4, 1, 0,
+	//	3, 2, 6, 3, 6, 7,
+	//	1, 5, 6, 1, 6, 2,
+	//	4, 0, 3, 4, 3, 7
+	//};
 
 	// Shader data
 	ID3D11VertexShader* m_simpleVS = nullptr;
@@ -86,7 +86,7 @@ private:
 	POINT m_lastMousePos;
 	Camera m_camera;
 	// Demo parameters
-	SimpleMath::Matrix m_worldMatrix;
+	SimpleMath::Matrix m_worldMatrix = SimpleMath::Matrix::Identity;;
 
 	/** Density Variables */
 	bool m_isDensityTextureGenerated = false;
