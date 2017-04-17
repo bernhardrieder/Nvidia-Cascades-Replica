@@ -13,53 +13,41 @@ ShaderLab::ShaderLab(HINSTANCE hInstance, int nCmdShow): D3D11App(hInstance, nCm
 ShaderLab::~ShaderLab()
 {
 	ShaderLab::cleanup();
-	unloadBuffers();
 	unloadShaders();
-	unloadTextures();
 }
 
 bool ShaderLab::Initialize()
 {
 	if (!D3D11App::Initialize())
 		return false;
-	if (!loadBuffers())
-	{
-		MessageBox(nullptr, TEXT("Failed to load content."), TEXT("Error"), MB_OK);
-		return false;
-	}
 	if (!loadShaders())
 	{
 		MessageBox(nullptr, TEXT("Failed to load shaders."), TEXT("Error"), MB_OK);
 		return false;
 	}
-	if(!loadTextures())	
-	{
-		MessageBox(nullptr, TEXT("Failed to load textures."), TEXT("Error"), MB_OK);
+	if (!m_densityTexGenerator.Initialize(m_device))
 		return false;
-	}
+	if (!m_rockVBGenerator.Initialize(m_device))
+		return false;
 
 
 	m_commonStates = std::make_unique<CommonStates>(m_device);
-	m_camera.SetPosition(0.f, 0.0f, -20.f);
+	m_camera.SetPosition(0., 0.0f,-20.f);
 	onResize();
+	m_camera.LookAt(Vector3::Up, Vector3(0, 10, 0) - m_camera.GetPosition());
+	m_camera.UpdateViewMatrix();
 
-	m_worldMatrix = XMMatrixRotationAxis(XMVectorSet(0, 1, 1, 0), XMConvertToRadians(90));
-	m_worldMatrix *= Matrix::CreateTranslation(2.f, 0.f, 0.f);
+	m_worldMatrix = Matrix::CreateWorld(Vector3(0, 0, 0), Vector3::Forward, Vector3::Up);
+	m_worldMatrix *= Matrix::CreateScale(10,10,10);
 	return true;
 }
 
 void ShaderLab::update(float deltaTime)
 {
 	checkAndProcessKeyboardInput(deltaTime);
-
-	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Frame], 0, nullptr, &m_camera.GetView(), 0, 0);
-
-	static float angle = 0.0f;
-	angle += 90.0f * deltaTime;
-	XMVECTOR rotationAxis = XMVectorSet(0, 1, 1, 0);
-
-	m_worldMatrix *= Matrix::CreateTranslation(-4.f, 0.f, 0.f);
-	//m_worldMatrix = XMMatrixRotationAxis(rotationAxis, XMConvertToRadians(angle));
+	
+	auto viewMatrix = m_camera.GetView();
+	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Frame], 0, nullptr, &viewMatrix, 0, 0);
 	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Object], 0, nullptr, &m_worldMatrix, 0, 0);
 }
 
@@ -68,93 +56,42 @@ void ShaderLab::render(float deltaTime)
 	assert(m_device);
 	assert(m_deviceContext);
 
-	if (!m_isDensityTextureCreated)
-		fillDensityTexture();
+	if (!m_isDensityTextureGenerated)
+		m_isDensityTextureGenerated = m_densityTexGenerator.Generate(m_deviceContext);
+	
+	if (m_isDensityTextureGenerated && !m_isRockVertexBufferGenerated)
+		m_isRockVertexBufferGenerated = m_rockVBGenerator.Generate(m_deviceContext, m_densityTexGenerator.GetTexture3DShaderResourceView());
 
-	/** SAMPLE CODE */
-	//Clear!
 	m_deviceContext->ClearRenderTargetView(m_renderTargetView, DirectX::Colors::CornflowerBlue);
 	m_deviceContext->ClearDepthStencilView(m_depthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 
-	const UINT vertexStride = sizeof(VertexPosColor);
+	const UINT vertexStride = sizeof(RockVertexBufferGenerator::GeometryShaderOutput);
 	const UINT offset = 0;
 
-	m_deviceContext->IASetVertexBuffers(0, 1, &m_vertexBuffer, &vertexStride, &offset);
+	auto vb = m_rockVBGenerator.GetVertexBuffer();
+	m_deviceContext->IASetVertexBuffers(0, 1, &vb, &vertexStride, &offset);
 	m_deviceContext->IASetInputLayout(m_inputLayoutSimpleVS);
-	m_deviceContext->IASetIndexBuffer(m_indexBuffer, DXGI_FORMAT_R16_UINT, 0);
 	m_deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	m_deviceContext->VSSetShader(m_simpleVS, nullptr, 0);
 	m_deviceContext->VSSetConstantBuffers(0, 3, m_constantBuffers);
 
-	m_deviceContext->GSSetShader(m_simpleGS, nullptr, 0);
-	m_deviceContext->GSSetShaderResources(0, 1, &m_densityTex3D_SRV);
-	auto samplerState = m_commonStates->LinearWrap();
-	m_deviceContext->GSSetSamplers(0, 1, &samplerState);
+	m_deviceContext->GSSetShader(nullptr, nullptr, 0);
 
-	m_deviceContext->RSSetState(m_rasterizerState);
+	auto wireframe = m_commonStates->Wireframe();
+	m_deviceContext->RSSetState(wireframe);
+	//m_deviceContext->RSSetState(m_rasterizerState);
 	m_deviceContext->RSSetViewports(1, &m_viewport);
 
 	m_deviceContext->PSSetShader(m_simplePS, nullptr, 0);
 
-	//m_deviceContext->OMSetRenderTargets(1, &m_densityTex3D_RTV, m_depthStencilView);
 	m_deviceContext->OMSetRenderTargets(1, &m_renderTargetView, m_depthStencilView);
 	m_deviceContext->OMSetDepthStencilState(m_depthStencilState, 1);
-
-	m_deviceContext->DrawIndexed(_countof(m_indices), 0, 0);
-
-	m_worldMatrix *= Matrix::CreateTranslation(4.f, 0.f, 0.f);
-	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Object], 0, nullptr, &m_worldMatrix, 0, 0);
-	m_deviceContext->VSSetConstantBuffers(0, 3, m_constantBuffers);
-	m_deviceContext->GSSetShader(nullptr, nullptr, 0);
-	m_deviceContext->DrawIndexed(_countof(m_indices), 0, 0);
-
+	
+	m_deviceContext->DrawAuto();
 
 	//Present Frame!!
 	m_swapChain->Present(0, 0);
-}
-
-//
-bool ShaderLab::loadBuffers()
-{
-	assert(m_device);
-
-	// Create an initialize the vertex buffer.
-	D3D11_BUFFER_DESC vertexBufferDesc;
-	ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
-	vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-	vertexBufferDesc.ByteWidth = sizeof(VertexPosColor) * _countof(m_vertices);
-	vertexBufferDesc.CPUAccessFlags = 0;
-	vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-
-	D3D11_SUBRESOURCE_DATA resourceData;
-	ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
-	resourceData.pSysMem = m_vertices;
-
-	HRESULT hr = m_device->CreateBuffer(&vertexBufferDesc, &resourceData, &m_vertexBuffer);
-	if (FAILED(hr))
-		return false;
-
-	// Create and initialize the index buffer.
-	D3D11_BUFFER_DESC indexBufferDesc;
-	ZeroMemory(&indexBufferDesc, sizeof(D3D11_BUFFER_DESC));
-	indexBufferDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
-	indexBufferDesc.ByteWidth = sizeof(WORD) * _countof(m_indices);
-	indexBufferDesc.CPUAccessFlags = 0;
-	indexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-	resourceData.pSysMem = m_indices;
-
-	hr = m_device->CreateBuffer(&indexBufferDesc, &resourceData, &m_indexBuffer);
-	if (FAILED(hr))
-		return false;
-
-	return true;
-}
-
-void ShaderLab::unloadBuffers()
-{
-	SafeRelease(m_indexBuffer);
-	SafeRelease(m_vertexBuffer);
 }
 
 bool ShaderLab::loadShaders()
@@ -197,8 +134,8 @@ bool ShaderLab::loadShaders()
 	// Create the input layout for the vertex shader.
 	D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
 	{
-		{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(VertexPosColor,Position), D3D11_INPUT_PER_VERTEX_DATA, 0},
-		{"COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(VertexPosColor,Color), D3D11_INPUT_PER_VERTEX_DATA, 0}
+		{"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(VertexPosNormal,Position), D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(VertexPosNormal,Normal), D3D11_INPUT_PER_VERTEX_DATA, 0}
 	};
 
 	hr = m_device->CreateInputLayout(vertexLayoutDesc, _countof(vertexLayoutDesc), vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize(), &m_inputLayoutSimpleVS);
@@ -241,10 +178,6 @@ bool ShaderLab::loadShaders()
 		return false;
 
 	SafeRelease(geometryShaderBlob);
-
-	if (!loadDensityFunctionShaders())
-		return false;
-
 	return true;
 }
 
@@ -264,8 +197,9 @@ void ShaderLab::onResize()
 	static float pi = 3.1415926535f; // cmath include isn't working?!?!
 	D3D11App::onResize();
 	// The window resized, so update the aspect ratio and recompute the projection matrix.
-	m_camera.SetLens(0.10f * pi, AspectRatio(), .1f, 1000.0f);
-	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Appliation], 0, nullptr, &m_camera.GetProj(), 0, 0);
+	m_camera.SetLens(.5f * pi, AspectRatio(), .1f, 10000.0f);
+	auto proj = m_camera.GetProj();
+	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Appliation], 0, nullptr, &proj, 0, 0);
 }
 
 void ShaderLab::onMouseDown(WPARAM btnState, int x, int y)
@@ -315,52 +249,36 @@ void ShaderLab::checkAndProcessKeyboardInput(float deltaTime)
 		m_camera.Strafe(10.0f * deltaTime);
 
 	m_camera.UpdateViewMatrix();
+
+	if (GetAsyncKeyState(VK_LEFT) & 0x8000)
+	{
+		//0.00109200052 --> old
+		//0.00003520004410 --> old
+		//0.000432299683
+		m_rockVBGenerator.test_depthStep -= 0.0001f*deltaTime;
+		m_isRockVertexBufferGenerated = false;
+	} 
+	else if (GetAsyncKeyState(VK_RIGHT) & 0x8000)
+	{
+		m_rockVBGenerator.test_depthStep += 0.0001f*deltaTime;
+		m_isRockVertexBufferGenerated = false;
+	}
+
+	if (GetAsyncKeyState(VK_UP) & 0x8000)
+	{
+		m_rockVBGenerator.test_heightStep += 0.001f*deltaTime;
+		m_isRockVertexBufferGenerated = false;
+	}
+	else if (GetAsyncKeyState(VK_DOWN) & 0x8000)
+	{
+		m_rockVBGenerator.test_heightStep -= 0.001f*deltaTime;
+		m_isRockVertexBufferGenerated = false;
+	}
 }
 
 bool ShaderLab::initDirectX()
 {
 	if (!D3D11App::initDirectX())
-		return false;
-
-	D3D11_TEXTURE3D_DESC texDesc;
-	ZeroMemory(&texDesc, sizeof(D3D11_TEXTURE3D_DESC));
-	texDesc.Width = 96; // x axis
-	texDesc.Height = 96; // y axis
-	texDesc.Depth = 256; // z axis
-	texDesc.MipLevels = 1;
-	texDesc.Format = DXGI_FORMAT_R16_FLOAT;
-	texDesc.Usage = D3D11_USAGE_DEFAULT;
-	texDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
-	//texDesc.CPUAccessFlags = 0;
-	//texDesc.MiscFlags = 0;
-	//
-	//texDesc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
-
-	HRESULT hr = m_device->CreateTexture3D(&texDesc, nullptr, &m_densityTex3D);
-	if (FAILED(hr))
-		return false;
-
-	// Give the buffer a useful name
-	//m_densityTex3D->SetPrivateData(WKPDID_D3DDebugObjectName, sizeof("Density Texture"), "Density Texture");
-
-	D3D11_RENDER_TARGET_VIEW_DESC rtvDesc;
-	ZeroMemory(&rtvDesc, sizeof(D3D11_RENDER_TARGET_VIEW_DESC));
-	rtvDesc.Format = texDesc.Format;
-	rtvDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE3D;
-
-	hr = m_device->CreateRenderTargetView(m_densityTex3D, nullptr, &m_densityTex3D_RTV);
-	if (FAILED(hr))
-		return false;
-
-	D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
-	ZeroMemory(&srvDesc, sizeof(D3D11_SHADER_RESOURCE_VIEW_DESC));
-	srvDesc.Format = texDesc.Format;
-	srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE3D;
-	srvDesc.Texture3D.MipLevels = texDesc.MipLevels;
-	srvDesc.Texture3D.MostDetailedMip = 0;
-
-	hr = m_device->CreateShaderResourceView(m_densityTex3D, &srvDesc, &m_densityTex3D_SRV);
-	if (FAILED(hr))
 		return false;
 
 	return true;
@@ -369,141 +287,4 @@ bool ShaderLab::initDirectX()
 void ShaderLab::cleanup()
 {
 	D3D11App::cleanup();
-	SafeRelease(m_densityTex3D);
-	SafeRelease(m_densityTex3D_RTV);
-	SafeRelease(m_densityTex3D_SRV);
-}
-
-void ShaderLab::fillDensityTexture()
-{
-	setViewportDimensions(96, 96);
-	m_deviceContext->ClearRenderTargetView(m_densityTex3D_RTV, Colors::White);
-	//m_deviceContext->ClearDepthStencilView(m_depthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
-
-	const UINT vertexStride = sizeof(VertexPos);
-	const UINT offset = 0;
-
-	m_deviceContext->IASetInputLayout(m_inputLayoutDensityVS);
-	m_deviceContext->IASetVertexBuffers(0, 1, &m_renderPortalvertexBuffer, &vertexStride, &offset);
-	m_deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-
-	m_deviceContext->VSSetShader(m_densityVS, nullptr, 0);
-	//m_deviceContext->VSSetConstantBuffers(0, 3, m_constantBuffers);
-
-	m_deviceContext->GSSetShader(m_densityGS, nullptr, 0);
-
-	//rasterizer
-	m_deviceContext->RSSetState(m_rasterizerState);
-	m_deviceContext->RSSetViewports(1, &m_viewport);
-
-	m_deviceContext->PSSetShader(m_densityPS, nullptr, 0);
-	m_deviceContext->PSSetShaderResources(0, m_noiseTexCount, m_noiseTexSRV );
-	
-	auto samplerState = m_commonStates->LinearWrap();
-	m_deviceContext->PSSetSamplers(0, 1, &samplerState);
-
-	//output merger
-	m_deviceContext->OMSetRenderTargets(1, &m_densityTex3D_RTV, nullptr);
-	//m_deviceContext->OMSetDepthStencilState(m_depthStencilState, 1);
-
-	m_deviceContext->DrawInstanced(6, 256, 0, 0);
-	//m_swapChain->Present(0, 0);
-
-
-	/** RESET */
-	//reset render target - otherwise the density SRV can't be used
-	m_deviceContext->OMSetRenderTargets(0, nullptr, nullptr);
-
-	//release density rtv?
-
-	setViewportDimensions(static_cast<FLOAT>(m_windowWidth), static_cast<FLOAT>(m_windowHeight));
-	m_isDensityTextureCreated = true;
-}
-
-bool ShaderLab::loadDensityFunctionShaders()
-{
-	ID3DBlob *vsBlob, *gsBlob, *psBlob;
-
-#if _DEBUG
-	LPCWSTR compiledVS = L"Shader/create_density_tex3d_VS_d.cso";
-	LPCWSTR compiledGS = L"Shader/create_density_tex3d_GS_d.cso";
-	LPCWSTR compilesPS = L"Shader/create_density_tex3d_PS_d.cso";
-#else
-	LPCWSTR compiledVS = L"Shader/create_density_tex3d_VS.cso";
-	LPCWSTR compiledGS = L"Shader/create_density_tex3d_GS.cso";
-	LPCWSTR compilesPS = L"Shader/create_density_tex3d_PS.cso";
-#endif
-
-	HRESULT HR_VS, HR_GS, HR_PS;
-	HR_VS = D3DReadFileToBlob(compiledVS, &vsBlob);
-	HR_GS = D3DReadFileToBlob(compiledGS, &gsBlob);
-	HR_PS = D3DReadFileToBlob(compilesPS, &psBlob);
-
-	if (FAILED(HR_VS) || FAILED(HR_GS) || FAILED(HR_PS))
-		return false;
-
-	HR_VS = m_device->CreateVertexShader(vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), nullptr, &m_densityVS);
-	HR_GS = m_device->CreateGeometryShader(gsBlob->GetBufferPointer(), gsBlob->GetBufferSize(), nullptr, &m_densityGS);
-	HR_PS = m_device->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, &m_densityPS);
-
-	if (FAILED(HR_VS) || FAILED(HR_GS) || FAILED(HR_PS))
-		return false;
-
-	// Create the input layout for the vertex shader.
-	D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
-	{
-		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(VertexPos,Position), D3D11_INPUT_PER_VERTEX_DATA, 0 }
-		//{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, offsetof(VertexPosColor,Color), D3D11_INPUT_PER_VERTEX_DATA, 0 }
-	};
-
-	HR_VS = m_device->CreateInputLayout(vertexLayoutDesc, _countof(vertexLayoutDesc), vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), &m_inputLayoutDensityVS);
-	if (FAILED(HR_VS))
-		return false;
-
-	SafeRelease(vsBlob);
-	SafeRelease(gsBlob);
-	SafeRelease(psBlob);
-
-
-	// Create an initialize the vertex buffer.
-	D3D11_BUFFER_DESC vertexBufferDesc;
-	ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
-	vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-	vertexBufferDesc.ByteWidth = sizeof(VertexPos) * _countof(m_renderPortalVertices);
-	vertexBufferDesc.CPUAccessFlags = 0;
-	vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-
-	D3D11_SUBRESOURCE_DATA resourceData;
-	ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
-	resourceData.pSysMem = m_renderPortalVertices;
-
-	HRESULT hr = m_device->CreateBuffer(&vertexBufferDesc, &resourceData, &m_renderPortalvertexBuffer);
-	if (FAILED(hr))
-		return false;
-
-	return true;
-}
-
-bool ShaderLab::loadTextures()
-{
-	for(int i = 0; i < m_noiseTexCount; ++i)
-	{
-		// Load the texture in.
-		auto filename = (m_noiseTexPrefix + m_noiseTexFilename[i]);
-		HRESULT hr = CreateDDSTextureFromFile(m_device, filename.c_str(), nullptr, &m_noiseTexSRV[i]);
-
-		if (FAILED(hr))
-			return false;
-	}
-	
-	return true;
-}
-
-void ShaderLab::unloadTextures()
-{
-	for (int i = 0; i < m_noiseTexCount; ++i)
-	{
-		SafeRelease(m_noiseTexSRV[i]);
-	}
 }
