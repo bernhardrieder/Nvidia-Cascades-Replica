@@ -28,7 +28,7 @@ bool Density3DTextureGenerator::Initialize(ID3D11Device* device)
 	}
 	if (!loadTextures(device))
 	{
-		MessageBox(nullptr, TEXT("Density3DTextureGenerator: Failed to load textures."), TEXT("Error"), MB_OK);
+		MessageBox(nullptr, TEXT("Density3DTextureGenerator: Failed to load textures. Is Textures folder in execution folder?"), TEXT("Error"), MB_OK);
 		return false;
 	}
 	m_commonStates = std::make_unique<CommonStates>(device);

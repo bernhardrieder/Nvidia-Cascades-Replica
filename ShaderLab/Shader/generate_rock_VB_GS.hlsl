@@ -38,10 +38,6 @@ Texture3D tex;
 // trilinearinterp; clamps on XY, wraps on Z.
 SamplerState s;
 
-//SamplerState Linear_ClampXY_WrapZ;
-//SamplerState Nearest_ClampXY_WrapZ;
-//SamplerState LinearRepeat;
-
 float3 ComputeNormal(Texture3D tex, SamplerState s, float3 uvw)
 {
     float4 step = float4(inv_voxelDim.xyz, 0);

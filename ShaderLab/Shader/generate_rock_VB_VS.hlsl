@@ -27,7 +27,7 @@ cbuffer SliceInfos : register (b0)
 {
     // Updated each frame. To generate 5 slices this frame,
     // app has to put their world-space Y coords in slots [0..4] here.
-    float4 slice_world_space_Y_coord[256];
+    float4 slice_world_space_Y_coord[256]; // unused
     float4 g_depthStep;
     float4 g_heightStep;
 }
@@ -42,8 +42,6 @@ v2gConnector main(a2vConnector a2v)
     wsCoord.xz = a2v.uv.xy * 2 - 1; // convert input uv coords into -1 to +1 range
     //wsCoord.y = slice_world_space_Y_coord[a2v.nInstanceID].y; //old
     //wsCoord.y = a2v.nInstanceID * (1.f / 256.f) * WorldSpaceVolumeHeight + (a2v.nInstanceID) / 256.f;    
-    float width, height, depth;
-    tex.GetDimensions(width, height, depth);
     //wsCoord.y = (WorldSpaceVolumeHeight * (a2v.nInstanceID / depth) + (1 / depth));
     wsCoord.y = a2v.nInstanceID * g_heightStep.y;
     //wsCoord.y = a2v.nInstanceID * 0.021053f;

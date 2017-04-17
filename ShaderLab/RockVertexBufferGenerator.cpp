@@ -15,7 +15,6 @@ RockVertexBufferGenerator::~RockVertexBufferGenerator()
 	unloadConstantBuffers();
 	unloadVertexBuffer();
 	unloadSamplerStates();
-	unloadAdditionalID3D11Resources();
 }
 
 bool RockVertexBufferGenerator::Initialize(ID3D11Device* device)
@@ -40,11 +39,6 @@ bool RockVertexBufferGenerator::Initialize(ID3D11Device* device)
 		MessageBox(nullptr, TEXT("RockVertexBufferGenerator: Failed to load SamplerState!"), TEXT("Error"), MB_OK);
 		return false;
 	}
-	if(!loadAdditionalID3D11Resources(device))
-	{
-		MessageBox(nullptr, TEXT("RockVertexBufferGenerator: Failed to load additional ID3D11 Resources!"), TEXT("Error"), MB_OK);
-		return false;
-	}
 	m_commonStates = std::make_unique<CommonStates>(device);
 
 	return true;
@@ -52,62 +46,47 @@ bool RockVertexBufferGenerator::Initialize(ID3D11Device* device)
 
 bool RockVertexBufferGenerator::Generate(ID3D11DeviceContext* deviceContext, ID3D11ShaderResourceView* densityTexture3D) const
 {
-	//TODO: check if this is the proper way to handle this!? ==> should be updated every frame?!
 	CB_SliceInfo cb;
-	float step = 1.f / 256.f;
-
-	for (int i = 0; i < 256; ++i)
-		cb.slice_world_space_Y_coord[i] = { 0.f, step*i, 0.f, 0.f };
+	//float step = 1.f / 256.f;
+	//for (int i = 0; i < 256; ++i)
+	//	cb.slice_world_space_Y_coord[i] = { 0.f, step*i, 0.f, 0.f };
 	cb.g_depthStep = { test_depthStep, test_depthStep, test_depthStep, test_depthStep };
 	cb.g_heightStep = { test_heightStep, test_heightStep, test_heightStep, test_heightStep };
 
 	deviceContext->UpdateSubresource(m_constantBuffers[SliceInfos], 0, nullptr, &cb, 0, 0);
 
-
-	//disable pixel shader
-	
-	//render dummy 96x96 dummy vertex - points in rrange 0..1
-	//drawinstanced! N = 256?
-
 	const UINT vertexStride = sizeof(VertexShaderInput);
 	UINT offset = 0;
 
-	deviceContext->IASetInputLayout(m_vsInputLayout); //++++
-	deviceContext->IASetVertexBuffers(0, 1, &m_dummyVertexBuffer, &vertexStride, &offset); //++++
-	deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST); //++++
+	deviceContext->IASetInputLayout(m_vsInputLayout);
+	deviceContext->IASetVertexBuffers(0, 1, &m_dummyVertexBuffer, &vertexStride, &offset);
+	deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
 
-	deviceContext->VSSetShader(m_vertexShader, nullptr, 0); //++++
-	deviceContext->VSSetConstantBuffers(0, 1, &m_constantBuffers[SliceInfos]); //++++
-	deviceContext->VSSetShaderResources(0, 1, &densityTexture3D); //++++
-	deviceContext->VSSetSamplers(0, 1, &m_samplerState); //++++
+	deviceContext->VSSetShader(m_vertexShader, nullptr, 0);
+	deviceContext->VSSetConstantBuffers(0, 1, &m_constantBuffers[SliceInfos]);
+	deviceContext->VSSetShaderResources(0, 1, &densityTexture3D);
+	deviceContext->VSSetSamplers(0, 1, &m_samplerState);
 
-	deviceContext->GSSetShader(m_geometryShader, nullptr, 0); //++++
-	deviceContext->GSSetConstantBuffers(0, 2, m_constantBuffers); //++++
-	deviceContext->GSSetShaderResources(0, 1, &densityTexture3D); //++++
-	deviceContext->GSSetSamplers(0, 1, &m_samplerState); //++++
-	//deviceContext->GSSetConstantBuffers(2, 1, &m_constantBuffers[mc_lut_2]);
-
-	//deviceContext->RSSetState(m_rasterizerState);
-	//deviceContext->RSSetViewports(1, &m_viewport);
+	deviceContext->GSSetShader(m_geometryShader, nullptr, 0);
+	deviceContext->GSSetConstantBuffers(0, 2, m_constantBuffers);
+	deviceContext->GSSetShaderResources(0, 1, &densityTexture3D);
+	deviceContext->GSSetSamplers(0, 1, &m_samplerState);
 	deviceContext->RSSetState(nullptr);
 	deviceContext->RSSetViewports(0, nullptr);
 
 	deviceContext->PSSetShader(nullptr, nullptr, 0); 
 
-	deviceContext->SOSetTargets(1, &m_vertexBuffer, &offset); //++++
+	deviceContext->SOSetTargets(1, &m_vertexBuffer, &offset);
 
 	deviceContext->OMSetRenderTargets(0, nullptr, nullptr);
 	deviceContext->OMSetDepthStencilState(nullptr, 0);
-	//deviceContext->OMSetDepthStencilState(m_depthStencilState, 0);
 
-	deviceContext->DrawInstanced(96*96, m_maxRenderedSlices, 0, 0); //++++
-
+	deviceContext->DrawInstanced(96*96, m_maxRenderedSlices, 0, 0);
 
 	/** RESET */
 	deviceContext->VSSetShader(nullptr, nullptr, 0);
 	deviceContext->GSSetShader(nullptr, nullptr, 0);
 	deviceContext->PSSetShader(nullptr, nullptr, 0);
-	//deviceContext->OMSetRenderTargets(0, nullptr, nullptr);
 	//decouple vertexbuffer from SO
 	deviceContext->SOSetTargets(0, nullptr, nullptr);
 
@@ -139,7 +118,6 @@ bool RockVertexBufferGenerator::loadShaders(ID3D11Device* device)
 		{ 0, "NORMAL", 0, 0, 3, 0 }
 	};
 
-	//TODO: check if its working properly
 	HR_GS = device->CreateGeometryShaderWithStreamOutput(gsBlob->GetBufferPointer(), gsBlob->GetBufferSize(), pDecl, _countof(pDecl), NULL, 0, D3D11_SO_NO_RASTERIZED_STREAM, NULL, &m_geometryShader);
 
 	if (FAILED(HR_VS) || FAILED(HR_GS))
@@ -148,7 +126,6 @@ bool RockVertexBufferGenerator::loadShaders(ID3D11Device* device)
 	// Create the input layout for the vertex shader.
 	D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
 	{
-		//{ "POSITION", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }
 
 	};
@@ -165,7 +142,6 @@ bool RockVertexBufferGenerator::loadShaders(ID3D11Device* device)
 bool RockVertexBufferGenerator::loadConstantBuffers(ID3D11Device* device)
 {
 	CB_MC_LUT_1 mcLut1Data;
-	//std::copy(std::begin(g_mcCaseToNumpolysLUT), std::end(g_mcCaseToNumpolysLUT), std::begin(mcLut1Data.case_to_numpolys));
 	memcpy(mcLut1Data.case_to_numpolys, g_mcCaseToNumpolysLUT, sizeof g_mcCaseToNumpolysLUT);
 	memcpy(mcLut1Data.cornerAmask0123, g_mcCornerAmask0123LUT, sizeof g_mcCornerAmask0123LUT);
 	memcpy(mcLut1Data.cornerAmask4567, g_mcCornerAmask4567LUT, sizeof g_mcCornerAmask4567LUT);
@@ -182,7 +158,7 @@ bool RockVertexBufferGenerator::loadConstantBuffers(ID3D11Device* device)
 	bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 	//bufferDesc.ByteWidth = 5248; // from shader errors!
 	bufferDesc.ByteWidth = sizeof(CB_MC_LUT_1);
-	bufferDesc.CPUAccessFlags = 0; //D3D11_CPU_ACCESS_WRITE
+	bufferDesc.CPUAccessFlags = 0; 
 	bufferDesc.Usage = D3D11_USAGE_DEFAULT;
 	bufferDesc.StructureByteStride = 0;
 	bufferDesc.MiscFlags = 0;
@@ -211,10 +187,7 @@ bool RockVertexBufferGenerator::loadConstantBuffers(ID3D11Device* device)
 
 bool RockVertexBufferGenerator::loadVertexBuffer(ID3D11Device* device)
 {
-	//TOOD: create dummy vertex buffer
-	//std::vector<XMFLOAT3> vertices;
 	float step = 1.f/95.0f;
-	//step = 10;
 	int currentIndex = 0;
 	int maxIndex = 96 * 96;
 
@@ -250,7 +223,6 @@ bool RockVertexBufferGenerator::loadVertexBuffer(ID3D11Device* device)
 	D3D11_BUFFER_DESC vertexBufferDesc;
 	ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
 	vertexBufferDesc.BindFlags = D3D11_BIND_STREAM_OUTPUT | D3D11_BIND_VERTEX_BUFFER;
-	//TODO: check and set right num of outputs!
 	vertexBufferDesc.ByteWidth = sizeof(GeometryShaderOutput) * 96*96* m_maxRenderedSlices *15; //max 15 vertices per case!
 	vertexBufferDesc.CPUAccessFlags = 0;
 	vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
@@ -282,46 +254,6 @@ bool RockVertexBufferGenerator::loadSamplerStates(ID3D11Device* device)
 		return false;
 	
 	return true;
-}
-
-bool RockVertexBufferGenerator::loadAdditionalID3D11Resources(ID3D11Device* device)
-{	
-	// Setup depth/stencil state.
-	D3D11_DEPTH_STENCIL_DESC depthStencilStateDesc;
-	ZeroMemory(&depthStencilStateDesc, sizeof(D3D11_DEPTH_STENCIL_DESC));
-	depthStencilStateDesc.DepthEnable = FALSE;
-	depthStencilStateDesc.StencilEnable = FALSE;
-
-	HRESULT hr = device->CreateDepthStencilState(&depthStencilStateDesc, &m_depthStencilState);
-	if (FAILED(hr))
-		return false;
-
-	// Setup rasterizer state.
-	D3D11_RASTERIZER_DESC rasterizerDesc;
-	ZeroMemory(&rasterizerDesc, sizeof(D3D11_RASTERIZER_DESC));
-	rasterizerDesc.AntialiasedLineEnable = FALSE;
-	rasterizerDesc.CullMode = D3D11_CULL_BACK;
-	rasterizerDesc.DepthBias = 0;
-	rasterizerDesc.DepthBiasClamp = 0.0f;
-	rasterizerDesc.DepthClipEnable = TRUE;
-	rasterizerDesc.FillMode = D3D11_FILL_SOLID;
-	rasterizerDesc.FrontCounterClockwise = FALSE;
-	rasterizerDesc.MultisampleEnable = FALSE;
-	rasterizerDesc.ScissorEnable = FALSE;
-	rasterizerDesc.SlopeScaledDepthBias = 0.0f;
-
-	// Create the rasterizer state object.
-	hr = device->CreateRasterizerState(&rasterizerDesc, &m_rasterizerState);
-	if (FAILED(hr))
-		return false;
-
-	return true;
-}
-
-void RockVertexBufferGenerator::unloadAdditionalID3D11Resources()
-{
-	SafeRelease(m_rasterizerState);
-	SafeRelease(m_depthStencilState);
 }
 
 void RockVertexBufferGenerator::unloadSamplerStates()

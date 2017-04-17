@@ -23,12 +23,10 @@ private:
 	bool loadConstantBuffers(ID3D11Device* device);
 	bool loadVertexBuffer(ID3D11Device* device);
 	bool loadSamplerStates(ID3D11Device* device);
-	bool loadAdditionalID3D11Resources(ID3D11Device* device);
 	void unloadConstantBuffers();
 	void unloadShaders();
 	void unloadVertexBuffer();
 	void unloadSamplerStates();
-	void unloadAdditionalID3D11Resources();
 
 	struct VertexShaderInput
 	{
@@ -76,8 +74,6 @@ private:
 	// trilinearinterp; clamps on XY, wraps on Z.
 	ID3D11SamplerState* m_samplerState = nullptr;
 
-	ID3D11DepthStencilState* m_depthStencilState = nullptr;
-	ID3D11RasterizerState* m_rasterizerState = nullptr;
 
 #if _DEBUG
 	const wchar_t* m_compiledVSPath = L"Shader/generate_rock_VB_VS_d.cso";
