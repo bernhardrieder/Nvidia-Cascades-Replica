@@ -1,37 +1,39 @@
-cbuffer PerApplication : register( b0 )
+struct a2vConnector
+{
+    float4 wsCoord_Ambo : POSITION;
+    float3 wsNormal : NORMAL;
+};
+
+struct v2pConnector
+{
+    float4 pos : SV_Position;
+    float4 color : COLOR;
+    float3 wsNormal : NORMAL;
+};
+
+cbuffer PerApplication : register(b0)
 {
     matrix projectionMatrix;
 }
 
-cbuffer PerFrame : register( b1 )
+cbuffer PerFrame : register(b1)
 {
     matrix viewMatrix;
 }
 
-cbuffer PerObject : register( b2 )
+cbuffer PerObject : register(b2)
 {
     matrix worldMatrix;
 }
 
-struct AppData
+v2pConnector main(a2vConnector IN)
 {
-    float3 position : POSITION;
-    float3 color: COLOR;
-};
+    v2pConnector OUT;
 
-struct VertexShaderOutput
-{
-    float4 color : COLOR;
-    float4 position : SV_POSITION;
-};
-
-VertexShaderOutput vs( AppData IN )
-{
-    VertexShaderOutput OUT;
-
-    matrix mvp = mul( projectionMatrix, mul( viewMatrix, worldMatrix ) );
-    OUT.position = mul( mvp, float4( IN.position, 1.0f ) );
-    OUT.color = float4( IN.color, 1.0f );
+    matrix mvp = mul(projectionMatrix, mul(viewMatrix, worldMatrix));
+    OUT.pos = mul(mvp, float4(IN.wsCoord_Ambo.xyz, 1.f));
+    OUT.color = float4(1.f, 0.f, 0.f, 1.0f);
+    OUT.wsNormal = IN.wsNormal;
 
     return OUT;
 }
