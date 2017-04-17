@@ -349,6 +349,31 @@ void ShaderLab::checkAndProcessKeyboardInput(float deltaTime)
 		m_camera.Strafe(10.0f * deltaTime);
 
 	m_camera.UpdateViewMatrix();
+
+	if (GetAsyncKeyState(VK_LEFT) & 0x8000)
+	{
+		//0.00109200052 --> old
+		//0.00003520004410
+		//0.000432299683
+		m_rockVBGenerator.test_depthStep -= 0.0001f*deltaTime;
+		m_isRockVertexBufferGenerated = false;
+	} 
+	else if (GetAsyncKeyState(VK_RIGHT) & 0x8000)
+	{
+		m_rockVBGenerator.test_depthStep += 0.0001f*deltaTime;
+		m_isRockVertexBufferGenerated = false;
+	}
+
+	if (GetAsyncKeyState(VK_UP) & 0x8000)
+	{
+		m_rockVBGenerator.test_heightStep += 0.001f*deltaTime;
+		m_isRockVertexBufferGenerated = false;
+	}
+	else if (GetAsyncKeyState(VK_DOWN) & 0x8000)
+	{
+		m_rockVBGenerator.test_heightStep -= 0.001f*deltaTime;
+		m_isRockVertexBufferGenerated = false;
+	}
 }
 
 bool ShaderLab::initDirectX()

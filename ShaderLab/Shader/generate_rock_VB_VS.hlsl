@@ -28,6 +28,8 @@ cbuffer SliceInfos : register (b0)
     // Updated each frame. To generate 5 slices this frame,
     // app has to put their world-space Y coords in slots [0..4] here.
     float4 slice_world_space_Y_coord[256];
+    float4 g_depthStep;
+    float4 g_heightStep;
 }
 
 // converts a point in world space to 3D texture space (for sampling the 3D texture):
@@ -42,7 +44,10 @@ v2gConnector main(a2vConnector a2v)
     //wsCoord.y = a2v.nInstanceID * (1.f / 256.f) * WorldSpaceVolumeHeight + (a2v.nInstanceID) / 256.f;    
     float width, height, depth;
     tex.GetDimensions(width, height, depth);
-    wsCoord.y = (WorldSpaceVolumeHeight * (a2v.nInstanceID / depth) + (1 / depth));
+    //wsCoord.y = (WorldSpaceVolumeHeight * (a2v.nInstanceID / depth) + (1 / depth));
+    wsCoord.y = a2v.nInstanceID * g_heightStep.y;
+    //wsCoord.y = a2v.nInstanceID * 0.021053f;
+    //wsCoord.y = a2v.nInstanceID * WorldSpaceVolumeHeight/256.f;
     float3 uvw = WS_to_UVW(wsCoord);
     //float3 uvw = float3(a2v.uv.x, a2v.uv.y, wsCoord.y * WorldSpaceVolumeHeight);
     
@@ -63,63 +68,18 @@ v2gConnector main(a2vConnector a2v)
 
     //float3 step = float3(1.0f / 95.0f, 0.f, WorldSpaceVolumeHeight * a2v.nInstanceID / 256.f);
 
-    float3 step = float3(1.0f / 95.0f, 0.f, 0);
-    float z = uvw.z /100.f ;
-    float4 f0123 = float4(tex.SampleLevel(s, float3(uvw.xy, z) + step.yyy, 0).x,
+    float3 step = float3(1.0f / 95.0f, 0.f, g_depthStep.x);
+    //float z = uvw.z /100.f ;
+    float z = uvw.z /256.f;
+    float4 f0123 = float4(  tex.SampleLevel(s, float3(uvw.xy, z) + step.yyy, 0).x,
                             tex.SampleLevel(s, float3(uvw.xy, z) + step.yyz, 0).x,
                             tex.SampleLevel(s, float3(uvw.xy, z) + step.xyz, 0).x,
                             tex.SampleLevel(s, float3(uvw.xy, z) + step.xyy, 0).x);
-    float4 f4567 = float4(tex.SampleLevel(s, float3(uvw.xy, z) + step.yxy, 0).x,
+    float4 f4567 = float4(  tex.SampleLevel(s, float3(uvw.xy, z) + step.yxy, 0).x,
                             tex.SampleLevel(s, float3(uvw.xy, z) + step.yxz, 0).x,
                             tex.SampleLevel(s, float3(uvw.xy, z) + step.xxz, 0).x,
                             tex.SampleLevel(s, float3(uvw.xy, z) + step.xxy, 0).x);
-
-    //float3 step = float3(1.0f / 95.0f, 0.f, 1.0f / 256.f);
-    ////Version 1 - cascade slides NEW
-    //float z = uvw.z;
-    //float z = 0.f;
-    //float4 f0123 = float4(tex.SampleLevel(s, float3(uvw.xy, z) + step.yxy, 0).x,
-    //                        tex.SampleLevel(s, float3(uvw.xy, z) + step.xxy, 0).x,
-    //                        tex.SampleLevel(s, float3(uvw.xy, z) + step.xyy, 0).x,
-    //                        tex.SampleLevel(s, float3(uvw.xy, z) + step.yyy, 0).x);
-    //float4 f4567 = float4(tex.SampleLevel(s, float3(uvw.xy, z) + step.yxz, 0).x,
-    //                        tex.SampleLevel(s, float3(uvw.xy, z) + step.xxz, 0).x,
-    //                        tex.SampleLevel(s, float3(uvw.xy, z) + step.xyz, 0).x,
-    //                        tex.SampleLevel(s, float3(uvw.xy, z) + step.yyz, 0).x);
-
-    //version 2
-    //float z = (a2v.nInstanceID / 256.f);
-    //float z = 0.f;
-    //float4 f0123 = float4(  tex.SampleLevel(s, float3(uvw.xy, z) + step.yxy, 0).x,
-    //                        tex.SampleLevel(s, float3(uvw.xy, z) + step.yyy, 0).x,
-    //                        tex.SampleLevel(s, float3(uvw.xy, z) + step.xyy, 0).x,
-    //                        tex.SampleLevel(s, float3(uvw.xy, z) + step.yxy, 0).x);
-    //float4 f4567 = float4(  tex.SampleLevel(s, float3(uvw.xy, z) + step.yxz, 0).x,
-    //                        tex.SampleLevel(s, float3(uvw.xy, z) + step.yyz, 0).x,
-    //                        tex.SampleLevel(s, float3(uvw.xy, z) + step.xyz, 0).x,
-    //                        tex.SampleLevel(s, float3(uvw.xy, z) + step.yxz, 0).x);
-
-    ////version 3
-    //float width, height, depth;
-    //tex.GetDimensions(width, height, depth);
-    ////float3 step = float3(1.0f / 95.0f, 0.f, 1.f / depth);
-    ////float z = uvw.z / 100.f;
-
-    ////float4 step = float4(inv_voxelDimMinusOne.xzy, 0);
-    //float4 step = float4(1.0f / width, 1.0f / height, a2v.nInstanceID / depth, 0.f);
-    //float4 f0123;
-    //float4 f4567; 
-    //float z = 0 ;
-    ////float z = 0.f;
-
-    //f0123.x = tex.SampleLevel(s, float3(uvw.xy, z) + step.www, 0).x;
-    //f0123.y = tex.SampleLevel(s, float3(uvw.xy, z) + step.wwz, 0).x;
-    //f0123.z = tex.SampleLevel(s, float3(uvw.xy, z) + step.xwz, 0).x;
-    //f0123.w = tex.SampleLevel(s, float3(uvw.xy, z) + step.xww, 0).x;
-    //f4567.x = tex.SampleLevel(s, float3(uvw.xy, z) + step.wyw, 0).x;
-    //f4567.y = tex.SampleLevel(s, float3(uvw.xy, z) + step.wyz, 0).x;
-    //f4567.z = tex.SampleLevel(s, float3(uvw.xy, z) + step.xyz, 0).x;
-    //f4567.w = tex.SampleLevel(s, float3(uvw.xy, z) + step.xyw, 0).x;
+    
 
     // determine which of the 256 marching cubes cases we have forthis cell:
     uint4 n0123 = (uint4) saturate(f0123 * 99999);

@@ -15,6 +15,9 @@ public:
 		DirectX::XMFLOAT4 wsCoord_Ambo;
 		DirectX::XMFLOAT3 wsNormal;
 	};
+
+	float test_depthStep = 0.000432299683f;
+	float test_heightStep = 0.021053f;
 private:
 	bool loadShaders(ID3D11Device* device);
 	bool loadConstantBuffers(ID3D11Device* device);
@@ -56,9 +59,11 @@ private:
 	struct CB_SliceInfo
 	{
 		DirectX::XMFLOAT4 slice_world_space_Y_coord[256];
+		DirectX::XMFLOAT4 g_depthStep;
+		DirectX::XMFLOAT4 g_heightStep;
 	};
 
-	uint32_t m_maxRenderedSlices = 50;
+	uint32_t m_maxRenderedSlices = 256;
 	ID3D11Buffer* m_constantBuffers[NumConstantBuffers];
 	ID3D11VertexShader* m_vertexShader = nullptr;
 	ID3D11InputLayout* m_vsInputLayout = nullptr;
@@ -81,6 +86,8 @@ private:
 	const wchar_t* m_compiledVSPath = L"Shader/generate_rock_VB_VS.cso";
 	const wchar_t* m_compiledGSPath = L"Shader/generate_rock_VB_GS.cso";
 #endif
+
+
 
 };
 

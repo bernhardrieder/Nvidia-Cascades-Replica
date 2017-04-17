@@ -53,12 +53,15 @@ bool RockVertexBufferGenerator::Initialize(ID3D11Device* device)
 bool RockVertexBufferGenerator::Generate(ID3D11DeviceContext* deviceContext, ID3D11ShaderResourceView* densityTexture3D) const
 {
 	//TODO: check if this is the proper way to handle this!? ==> should be updated every frame?!
-	//CB_SliceInfo cb;
-	//float step = 1.f / 256.f;
+	CB_SliceInfo cb;
+	float step = 1.f / 256.f;
 
-	//for (int i = 0; i < 256; ++i)
-	//	cb.slice_world_space_Y_coord[i] = { 0.f, step*i, 0.f, 0.f };
-	//deviceContext->UpdateSubresource(m_constantBuffers[SliceInfos], 0, nullptr, &cb, 0, 0);
+	for (int i = 0; i < 256; ++i)
+		cb.slice_world_space_Y_coord[i] = { 0.f, step*i, 0.f, 0.f };
+	cb.g_depthStep = { test_depthStep, test_depthStep, test_depthStep, test_depthStep };
+	cb.g_heightStep = { test_heightStep, test_heightStep, test_heightStep, test_heightStep };
+
+	deviceContext->UpdateSubresource(m_constantBuffers[SliceInfos], 0, nullptr, &cb, 0, 0);
 
 
 	//disable pixel shader
