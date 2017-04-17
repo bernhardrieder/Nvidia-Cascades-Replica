@@ -53,12 +53,12 @@ bool RockVertexBufferGenerator::Initialize(ID3D11Device* device)
 bool RockVertexBufferGenerator::Generate(ID3D11DeviceContext* deviceContext, ID3D11ShaderResourceView* densityTexture3D) const
 {
 	//TODO: check if this is the proper way to handle this!? ==> should be updated every frame?!
-	CB_SliceInfo cb;
-	float step = 1.f / 256.f;
+	//CB_SliceInfo cb;
+	//float step = 1.f / 256.f;
 
-	for (int i = 0; i < 256; ++i)
-		cb.slice_world_space_Y_coord[i] = { 0.f, step*i*100, 0.f, 0.f };
-	deviceContext->UpdateSubresource(m_constantBuffers[SliceInfos], 0, nullptr, &cb, 0, 0);
+	//for (int i = 0; i < 256; ++i)
+	//	cb.slice_world_space_Y_coord[i] = { 0.f, step*i, 0.f, 0.f };
+	//deviceContext->UpdateSubresource(m_constantBuffers[SliceInfos], 0, nullptr, &cb, 0, 0);
 
 
 	//disable pixel shader
@@ -69,19 +69,19 @@ bool RockVertexBufferGenerator::Generate(ID3D11DeviceContext* deviceContext, ID3
 	const UINT vertexStride = sizeof(VertexShaderInput);
 	UINT offset = 0;
 
-	deviceContext->IASetInputLayout(m_vsInputLayout);
-	deviceContext->IASetVertexBuffers(0, 1, &m_dummyVertexBuffer, &vertexStride, &offset);
-	deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
+	deviceContext->IASetInputLayout(m_vsInputLayout); //++++
+	deviceContext->IASetVertexBuffers(0, 1, &m_dummyVertexBuffer, &vertexStride, &offset); //++++
+	deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST); //++++
 
-	deviceContext->VSSetShader(m_vertexShader, nullptr, 0);
-	deviceContext->VSSetConstantBuffers(0, 1, &m_constantBuffers[SliceInfos]);
-	deviceContext->VSSetShaderResources(0, 1, &densityTexture3D);
-	deviceContext->VSSetSamplers(0, 1, &m_samplerState);
+	deviceContext->VSSetShader(m_vertexShader, nullptr, 0); //++++
+	deviceContext->VSSetConstantBuffers(0, 1, &m_constantBuffers[SliceInfos]); //++++
+	deviceContext->VSSetShaderResources(0, 1, &densityTexture3D); //++++
+	deviceContext->VSSetSamplers(0, 1, &m_samplerState); //++++
 
-	deviceContext->GSSetShader(m_geometryShader, nullptr, 0);
-	deviceContext->GSSetSamplers(0, 1, &m_samplerState);
-	deviceContext->GSSetShaderResources(0, 1, &densityTexture3D);
-	deviceContext->GSSetConstantBuffers(0, 2, m_constantBuffers);
+	deviceContext->GSSetShader(m_geometryShader, nullptr, 0); //++++
+	deviceContext->GSSetConstantBuffers(0, 2, m_constantBuffers); //++++
+	deviceContext->GSSetShaderResources(0, 1, &densityTexture3D); //++++
+	deviceContext->GSSetSamplers(0, 1, &m_samplerState); //++++
 	//deviceContext->GSSetConstantBuffers(2, 1, &m_constantBuffers[mc_lut_2]);
 
 	//deviceContext->RSSetState(m_rasterizerState);
@@ -89,14 +89,15 @@ bool RockVertexBufferGenerator::Generate(ID3D11DeviceContext* deviceContext, ID3
 	deviceContext->RSSetState(nullptr);
 	deviceContext->RSSetViewports(0, nullptr);
 
-	deviceContext->PSSetShader(nullptr, nullptr, 0);
+	deviceContext->PSSetShader(nullptr, nullptr, 0); 
 
-	deviceContext->SOSetTargets(1, &m_vertexBuffer, &offset);
+	deviceContext->SOSetTargets(1, &m_vertexBuffer, &offset); //++++
 
 	deviceContext->OMSetRenderTargets(0, nullptr, nullptr);
-	deviceContext->OMSetDepthStencilState(m_depthStencilState, 0);
+	deviceContext->OMSetDepthStencilState(nullptr, 0);
+	//deviceContext->OMSetDepthStencilState(m_depthStencilState, 0);
 
-	deviceContext->DrawInstanced(96*96, m_maxRenderedSlices, 0, 0);
+	deviceContext->DrawInstanced(96*96, m_maxRenderedSlices, 0, 0); //++++
 
 
 	/** RESET */
@@ -130,16 +131,13 @@ bool RockVertexBufferGenerator::loadShaders(ID3D11Device* device)
 	
 	D3D11_SO_DECLARATION_ENTRY pDecl[] =
 	{
-		// semantic name, semantic index, start component, component count, output slot
-		{ 0, "POSITION", 0, 0, 4, 0 },   
+		// stream num, semantic name, semantic index, start component, component count, output slot
+		{ 0, "SV_POSITION", 0, 0, 4, 0 },   
 		{ 0, "NORMAL", 0, 0, 3, 0 }
 	};
 
-	UINT stride = 7 * sizeof(float); // *NOT* sizeof the above array!
-	UINT elems = sizeof(pDecl) / sizeof(D3D11_SO_DECLARATION_ENTRY);
-
 	//TODO: check if its working properly
-	HR_GS = device->CreateGeometryShaderWithStreamOutput(gsBlob->GetBufferPointer(), gsBlob->GetBufferSize(), pDecl, elems, NULL, 0, D3D11_SO_NO_RASTERIZED_STREAM, NULL, &m_geometryShader);
+	HR_GS = device->CreateGeometryShaderWithStreamOutput(gsBlob->GetBufferPointer(), gsBlob->GetBufferSize(), pDecl, _countof(pDecl), NULL, 0, D3D11_SO_NO_RASTERIZED_STREAM, NULL, &m_geometryShader);
 
 	if (FAILED(HR_VS) || FAILED(HR_GS))
 		return false;
@@ -147,8 +145,8 @@ bool RockVertexBufferGenerator::loadShaders(ID3D11Device* device)
 	// Create the input layout for the vertex shader.
 	D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
 	{
-		{ "POSITION", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }
-		//{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+		//{ "POSITION", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }
 
 	};
 
@@ -199,7 +197,7 @@ bool RockVertexBufferGenerator::loadConstantBuffers(ID3D11Device* device)
 	
 
 	//bufferDesc.ByteWidth = 4096; // from shader error
-	bufferDesc.ByteWidth = sizeof(CB_SliceInfo); // from shader error
+	bufferDesc.ByteWidth = sizeof(CB_SliceInfo);
 	HRESULT hrCB3 = device->CreateBuffer(&bufferDesc, nullptr, &m_constantBuffers[SliceInfos]);
 	
 	if (FAILED(hrCB1) || FAILED(hrCB2) || FAILED (hrCB3))
@@ -221,9 +219,9 @@ bool RockVertexBufferGenerator::loadVertexBuffer(ID3D11Device* device)
 	{
 		for(float y = 0.f; y <= 1.f && currentIndex != maxIndex; y += step)
 		{
-			m_dummyVertices[currentIndex++].UV = {x,y};
+			m_dummyVertices[currentIndex++].UV = {x,y, 0.f};
 			if(currentIndex == maxIndex)
-				m_dummyVertices[currentIndex-1].UV = { 1.f, 1.f };
+				m_dummyVertices[currentIndex-1].UV = { 1.f, 1.f, 0.f };
 		}
 	}
 
@@ -238,6 +236,8 @@ bool RockVertexBufferGenerator::loadVertexBuffer(ID3D11Device* device)
 	D3D11_SUBRESOURCE_DATA resourceData;
 	ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
 	resourceData.pSysMem = m_dummyVertices;
+	resourceData.SysMemPitch = 0;
+	resourceData.SysMemSlicePitch = 0;
 
 	HRESULT hr = device->CreateBuffer(&dummyVBDesc, &resourceData, &m_dummyVertexBuffer);
 	if (FAILED(hr))
@@ -248,7 +248,7 @@ bool RockVertexBufferGenerator::loadVertexBuffer(ID3D11Device* device)
 	ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
 	vertexBufferDesc.BindFlags = D3D11_BIND_STREAM_OUTPUT | D3D11_BIND_VERTEX_BUFFER;
 	//TODO: check and set right num of outputs!
-	vertexBufferDesc.ByteWidth = sizeof(GeometryShaderOutput) * 96*96* m_maxRenderedSlices *15;
+	vertexBufferDesc.ByteWidth = sizeof(GeometryShaderOutput) * 96*96* m_maxRenderedSlices *15; //max 15 vertices per case!
 	vertexBufferDesc.CPUAccessFlags = 0;
 	vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
 
@@ -268,6 +268,11 @@ bool RockVertexBufferGenerator::loadSamplerStates(ID3D11Device* device)
 	desc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
 	desc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
 	desc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+
+	//from dxtk commonstates
+	desc.MaxAnisotropy = (device->GetFeatureLevel() > D3D_FEATURE_LEVEL_9_1) ? D3D11_MAX_MAXANISOTROPY : 2;
+	desc.MaxLOD = FLT_MAX;
+	desc.ComparisonFunc = D3D11_COMPARISON_NEVER;
 
 	HRESULT hr = device->CreateSamplerState(&desc, &m_samplerState);
 	if (FAILED(hr))

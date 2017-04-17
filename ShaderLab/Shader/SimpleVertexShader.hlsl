@@ -9,22 +9,30 @@ struct a2vConnector
 struct v2gConnector
 {
     float4 color : COLOR;
-    float4 pos : POSITIONT;
+    float4 pos : POSITION1;
     float4 originalPos : POSITION;
 };
 
-v2gConnector main(a2vConnector IN)
+struct g2pConnector
 {
-    v2gConnector OUT;
+    float4 pos : SV_Position;
+    float4 color : COLOR;
+    float3 wsNormal : NORMAL;
+};
+
+g2pConnector main(a2vConnector IN)
+{
+    g2pConnector OUT;
 
     matrix mvp = mul(projectionMatrix, mul(viewMatrix, worldMatrix));
-    OUT.pos = mul(mvp, float4(IN.wsCoord_Ambo));
-    //OUT.pos = IN.wsCoord_Ambo;
-    OUT.originalPos = IN.wsCoord_Ambo;
+    OUT.pos = mul(mvp, float4(IN.wsCoord_Ambo.xyz, 1.f));
+    //OUT.pos = float4(IN.wsCoord_Ambo.xyz, 0);
+    //OUT.originalPos = IN.wsCoord_Ambo;
     //OUT.color = float4(IN.color, 1.0f);
 
     //OUT.pos = IN.wsCoord_Ambo;
-    OUT.color = float4( 0.f, 0.f, 0.f, 1.0f );
+    OUT.color = float4(1.f, 0.f, 0.f, 1.0f);
+    OUT.wsNormal = IN.wsNormal;
 
     return OUT;
 }

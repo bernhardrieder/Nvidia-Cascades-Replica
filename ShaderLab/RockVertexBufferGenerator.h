@@ -29,7 +29,7 @@ private:
 
 	struct VertexShaderInput
 	{
-		DirectX::XMFLOAT2 UV;
+		DirectX::XMFLOAT3 UV;
 	};
 
 	enum ShaderConstanBufferType

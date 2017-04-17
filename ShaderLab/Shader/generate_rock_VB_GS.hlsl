@@ -3,7 +3,7 @@
 
 struct v2gConnector
 {
-    float3 wsCoord : POSITION; //coords are for the LOWER-LEFT corner of the cell.
+    float4 wsCoord : POSITION; //coords are for the LOWER-LEFT corner of the cell.
     float3 uvw_3dtex : TEX; //coords are for the LOWER-LEFT corner of the cell.
     float4 field0123 : TEX1; // the density values
     float4 field4567 : TEX2; // at the corners
@@ -14,7 +14,7 @@ struct g2vbConnector
 { 
     // Stream out to a VB & save for reuse!
     // .xyz = wsCoord, .w = occlusion
-    float4 wsCoord_Ambo : POSITION;
+    float4 wsCoord_Ambo : SV_POSITION;
     float3 wsNormal : NORMAL;
 };
 
@@ -57,25 +57,31 @@ g2vbConnector PlaceVertOnEdge(v2gConnector input, int edgeNum)
     // @ the two corners that this edge connects, then find how far along 
     // that edge the strength value hits zero.
     // Along this cell edge, where does the density value hit zero?
-    float str0 = dot(cornerAmask0123[edgeNum], input.field0123) + dot(cornerAmask4567[edgeNum], input.field4567);
-    float str1 = dot(cornerBmask0123[edgeNum], input.field0123) + dot(cornerBmask4567[edgeNum], input.field4567);
+    float str0 = dot(cornerAmask0123[edgeNum], input.field0123) + 
+                 dot(cornerAmask4567[edgeNum], input.field4567);
+    float str1 = dot(cornerBmask0123[edgeNum], input.field0123) + 
+                 dot(cornerBmask4567[edgeNum], input.field4567);
     float t = saturate(str0 / (str0 - str1)); //0..1 // 'saturate' keeps occasional crazy stray triangle from appearing @ edges
 
     // use that to get wsCoord and uvw coords
-    float3 pos_within_cell = vec_start[edgeNum].xyz + t * vec_dir[edgeNum].xyz; //[0..1]
+    float3 pos_within_cell = saturate(vec_start[edgeNum].xyz + t * vec_dir[edgeNum].xyz); //[0..1]
+    //float3 pos_within_cell = vec_start[edgeNum].xyz + t * vec_dir[edgeNum].xyz; //[0..1]
     float3 wsCoord = input.wsCoord.xyz + pos_within_cell.xyz * wsVoxelSize;
-    /**cascades demo uses:
-    wsCoord.xz = input.wsCoord.xz + pos_within_cell.xz*wsVoxelSize.xx;
-    wsCoord.y = lerp(input.wsCoord.y, input.wsCoord.w, pos_within_cell.y);
-    */
+    /**cascades demo uses:    */
+    //float3 wsCoord;
+    //wsCoord.xz = input.wsCoord.xz + pos_within_cell.xz*wsVoxelSize.xx;
+    //wsCoord.y = lerp(input.wsCoord.y, input.wsCoord.w, pos_within_cell.y);
+
     float3 uvw = input.uvw_3dtex + (pos_within_cell * inv_voxelDimMinusOne.xyz).xzy;
 
     g2vbConnector output;
     output.wsCoord_Ambo.xyz = wsCoord;
     //output.wsCoord_Ambo.w = grad_ambo_tex.SampleLevel(s, uvw, 0).w;
-    output.wsNormal = ComputeNormal(tex, s, uvw);
-
     output.wsCoord_Ambo.w = 0.f; //DUMMY
+
+    output.wsNormal = ComputeNormal(tex, s, uvw);
+    //output.wsNormal = float3(0, 0, 0); // dummy
+
     return output;
 }
 

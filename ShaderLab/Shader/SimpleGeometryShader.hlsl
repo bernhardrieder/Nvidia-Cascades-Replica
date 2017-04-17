@@ -6,14 +6,15 @@
 struct v2gConnector
 {
     float4 color : COLOR;
-    float4 pos : POSITIONT;
+    float4 pos : POSITION1;
     float4 originalPos : POSITION;
 };
 
 struct g2pConnector
 {
     float4 color : COLOR;
-    float4 pos : SV_Position;
+    float4 pos : Position1;
+    float4 pos2 : Position;
 };
 
 [maxvertexcount(3)]
@@ -30,13 +31,17 @@ void main(
             ++zeroCount;
         }
     }
-    if(zeroCount != 3)
+    //if(zeroCount != 3)
     {
         for (uint i = 0; i < 3; i++)
         {
             g2pConnector g2p;
-            g2p.pos = input[i].pos;
-            g2p.color = input[i].pos;
+            
+            matrix mvp = mul(projectionMatrix, mul(viewMatrix, worldMatrix));
+            g2p.pos = mul(mvp, float4(input[i].pos));
+            g2p.pos2 = mul(mvp, float4(input[i].pos));
+            //g2p.pos = input[i].pos;
+            g2p.color = input[i].color;
             output.Append(g2p);
         }
     }
