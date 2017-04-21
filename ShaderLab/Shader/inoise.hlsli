@@ -79,53 +79,53 @@ static float4 g4[] = {
 
 // Textures
 
-Texture2D permTexture
-<
-    string texturetype = "2D";
-    string format = "l8";
-	string function = "GeneratePermTexture";
-	int width = 256, height = 1;
->;
+//Texture2D permTexture
+//<
+//    string texturetype = "2D";
+//    string format = "l8";
+//	string function = "GeneratePermTexture";
+//	int width = 256, height = 1;
+//>;
 
-Texture2D permTexture2d
-<
-    string texturetype = "2D";
-    string format = "a8r8g8b8";
-	string function = "GeneratePermTexture2d";
-	int width = 256, height = 256;
->;
+//Texture2D permTexture2d
+//<
+//    string texturetype = "2D";
+//    string format = "a8r8g8b8";
+//	string function = "GeneratePermTexture2d";
+//	int width = 256, height = 256;
+//>;
 
-Texture2D gradTexture
-<
-    string texturetype = "2D";
-	string format = "q8w8v8u8";
-	string function = "GenerateGradTexture";
-	int width = 16, height = 1;
->;
+//Texture2D gradTexture
+//<
+//    string texturetype = "2D";
+//	string format = "q8w8v8u8";
+//	string function = "GenerateGradTexture";
+//	int width = 16, height = 1;
+//>;
 
-Texture2D permGradTexture
-<
-    string texturetype = "2D";
-	string format = "q8w8v8u8";
-	string function = "GeneratePermGradTexture";
-	int width = 256, height = 1;
->;
+//Texture2D permGradTexture
+//<
+//    string texturetype = "2D";
+//	string format = "q8w8v8u8";
+//	string function = "GeneratePermGradTexture";
+//	int width = 256, height = 1;
+//>;
 
-Texture2D permGrad4dTexture
-<
-    string texturetype = "2D";
-	string format = "q8w8v8u8";
-	string function = "GeneratePermGrad4dTexture";
-	int width = 256, height = 1;
->;
+//Texture2D permGrad4dTexture
+//<
+//    string texturetype = "2D";
+//	string format = "q8w8v8u8";
+//	string function = "GeneratePermGrad4dTexture";
+//	int width = 256, height = 1;
+//>;
 
-Texture2D gradTexture4d
-<
-    string texturetype = "2D";
-	string format = "q8w8v8u8";
-	string function = "GenerateGradTexture4d";
-	int width = 32, height = 1;
->;
+//Texture2D gradTexture4d
+//<
+//    string texturetype = "2D";
+//	string format = "q8w8v8u8";
+//	string function = "GenerateGradTexture4d";
+//	int width = 32, height = 1;
+//>;
 
 // Functions to generate textures using CPU runtime
 
@@ -173,59 +173,59 @@ float4 GenerateGradTexture4d(float p : POSITION) : COLOR
 	return g4[p*32];
 }
 
-SamplerState permSampler
-{
-    AddressU  = Wrap;        
-    AddressV  = Clamp;
-    MAGFILTER = POINT;
-    MINFILTER = POINT;
-    MIPFILTER = NONE;   
-};
+//SamplerState permSampler
+//{
+//    AddressU  = Wrap;        
+//    AddressV  = Clamp;
+//    MAGFILTER = POINT;
+//    MINFILTER = POINT;
+//    MIPFILTER = NONE;   
+//};
 
-SamplerState permSampler2d
-{
-    AddressU  = Wrap;        
-    AddressV  = Wrap;
-    MAGFILTER = POINT;
-    MINFILTER = POINT;
-    MIPFILTER = NONE;   
-};
+//SamplerState permSampler2d
+//{
+//    AddressU  = Wrap;        
+//    AddressV  = Wrap;
+//    MAGFILTER = POINT;
+//    MINFILTER = POINT;
+//    MIPFILTER = NONE;   
+//};
 
-SamplerState gradSampler
-{
-    AddressU  = Wrap;        
-    AddressV  = Clamp;
-    MAGFILTER = POINT;
-    MINFILTER = POINT;
-    MIPFILTER = NONE;
-};
+//SamplerState gradSampler
+//{
+//    AddressU  = Wrap;        
+//    AddressV  = Clamp;
+//    MAGFILTER = POINT;
+//    MINFILTER = POINT;
+//    MIPFILTER = NONE;
+//};
 
-SamplerState permGradSampler
-{
-    AddressU  = Wrap;        
-    AddressV  = Clamp;
-    MAGFILTER = POINT;
-    MINFILTER = POINT;
-    MIPFILTER = NONE;
-};
+//SamplerState permGradSampler
+//{
+//    AddressU  = Wrap;        
+//    AddressV  = Clamp;
+//    MAGFILTER = POINT;
+//    MINFILTER = POINT;
+//    MIPFILTER = NONE;
+//};
 
-SamplerState permGrad4dSampler
-{
-    AddressU  = Wrap;        
-    AddressV  = Clamp;
-    MAGFILTER = POINT;
-    MINFILTER = POINT;
-    MIPFILTER = NONE;
-};
+//SamplerState permGrad4dSampler
+//{
+//    AddressU  = Wrap;        
+//    AddressV  = Clamp;
+//    MAGFILTER = POINT;
+//    MINFILTER = POINT;
+//    MIPFILTER = NONE;
+//};
 
-SamplerState gradSampler4d
-{
-    AddressU  = Wrap;        
-    AddressV  = Clamp;
-    MAGFILTER = POINT;
-    MINFILTER = POINT;
-    MIPFILTER = NONE;
-};
+//SamplerState gradSampler4d
+//{
+//    AddressU  = Wrap;        
+//    AddressV  = Clamp;
+//    MAGFILTER = POINT;
+//    MINFILTER = POINT;
+//    MIPFILTER = NONE;
+//};
 
 float3 fade(float3 t)
 {
@@ -241,33 +241,39 @@ float4 fade(float4 t)
 
 float perm(float x)
 {
-    return permTexture.Sample(permSampler, x);
+    return GeneratePermTexture(x);
+    //return permTexture.Sample(permSampler, x);
 }
 
 float4 perm2d(float2 p)
 {
-    return permTexture2d.Sample(permSampler2d, p);
+    return GeneratePermTexture2d(p);
+    //return permTexture2d.Sample(permSampler2d, p);
 }
 
 float grad(float x, float3 p)
 {
-	return dot(gradTexture.Sample(gradSampler, x*16), p);
+    return dot(GenerateGradTexture(x), p);
+	//return dot(gradTexture.Sample(gradSampler, x*16), p);
 }
 
 float gradperm(float x, float3 p)
 {
-	return dot(permGradTexture.Sample(permGradSampler, x), p);
+    return dot(GeneratePermGradTexture(x), p);
+	//return dot(permGradTexture.Sample(permGradSampler, x), p);
 }
 
 // 4d versions
 float grad(float x, float4 p)
 {
-	return dot(gradTexture4d.Sample(gradSampler4d, x), p);
+    return dot(GenerateGradTexture4d(x), p);
+	//return dot(gradTexture4d.Sample(gradSampler4d, x), p);
 }
 
 float gradperm(float x, float4 p)
 {
-	return dot(permGrad4dTexture.Sample(permGrad4dSampler, x), p);
+    return dot(GeneratePermGrad4dTexture(x), p);
+	//return dot(permGrad4dTexture.Sample(permGrad4dSampler, x), p);
 }
 
 // 3D noise

@@ -13,10 +13,7 @@ struct g2pConnector
 };
 
 [maxvertexcount(3)]
-void main(
-	triangle v2gConnector input[3],
-	inout TriangleStream<g2pConnector> output
-)
+void main(triangle v2gConnector input[3], inout TriangleStream<g2pConnector> output)
 {
 	for (uint i = 0; i < 3; i++)
 	{
