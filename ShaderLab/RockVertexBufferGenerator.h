@@ -6,71 +6,61 @@ public:
 	RockVertexBufferGenerator();
 	~RockVertexBufferGenerator();
 
-	bool Initialize(ID3D11Device* device);
+	bool Initialize(ID3D11Device* device, DirectX::XMINT3 densityTextureSize);
 	bool Generate(ID3D11DeviceContext* pDeviceContext, ID3D11ShaderResourceView* pDensityTexture3DShaderResourceView) const;
 	ID3D11Buffer* GetVertexBuffer() const;
 
 	struct GeometryShaderOutput
 	{
-		DirectX::XMFLOAT4 wsCoord_Ambo;
-		DirectX::XMFLOAT3 wsNormal;
+		DirectX::XMFLOAT4 WorldSpacePosition;
+		DirectX::XMFLOAT3 WorldSpaceNormal;
 	};
-
-	float test_depthStep = 0.000432299683f;
-	float test_heightStep = 0.021053f;
 private:
-	bool loadShaders(ID3D11Device* device);
-	bool loadConstantBuffers(ID3D11Device* device);
-	bool loadVertexBuffer(ID3D11Device* device);
-	bool loadSamplerStates(ID3D11Device* device);
-	void unloadConstantBuffers();
-	void unloadShaders();
-	void unloadVertexBuffer();
-	void unloadSamplerStates();
-
 	struct VertexShaderInput
 	{
-		DirectX::XMFLOAT3 UV;
+		DirectX::XMFLOAT4 VertexPosition;
 	};
+
+	bool loadShaders(ID3D11Device* device);
+	bool createConstantBuffers(ID3D11Device* device);
+	bool createVertexBuffer(ID3D11Device* device);
+	bool createSamplerStates(ID3D11Device* device);
+	void releaseConstantBuffers();
+	void releaseShaders();
+	void releaseVertexBuffer();
+	void releaseSamplerStates();
+
+	int createDummyVertices(VertexShaderInput** outVertices) const;
 
 	enum ShaderConstanBufferType
 	{
-		mc_lut_1 = 0,
-		mc_lut_2,
-		SliceInfos,
+		MarchingCubesLookUpTables = 0,
+		CornerStep,
 		NumConstantBuffers
 	};
-	struct CB_MC_LUT_1
+	struct CB_CornerStep
+	{
+		DirectX::XMFLOAT4 cornerStep[8];
+	};
+
+	struct CB_MC_LookUpTables
 	{
 		DirectX::XMINT4 case_to_numpolys[256];
-		DirectX::XMFLOAT4 cornerAmask0123[12];
-		DirectX::XMFLOAT4 cornerAmask4567[12];
-		DirectX::XMFLOAT4 cornerBmask0123[12];
-		DirectX::XMFLOAT4 cornerBmask4567[12];
-		DirectX::XMFLOAT4 vec_start[12];
-		DirectX::XMFLOAT4 vec_dir[12];
-	};
-	struct CB_MC_LUT_2
-	{
 		DirectX::XMINT4 g_triTable[1280];
 	};
-	struct CB_SliceInfo
-	{
-		DirectX::XMFLOAT4 slice_world_space_Y_coord[256];
-		DirectX::XMFLOAT4 g_depthStep;
-		DirectX::XMFLOAT4 g_heightStep;
-	};
 
-	uint32_t m_maxRenderedSlices = 256;
+	DirectX::XMINT3 m_densityTextureSize;
+	DirectX::XMFLOAT3 m_densityTextureSizeStep;
 	ID3D11Buffer* m_constantBuffers[NumConstantBuffers];
 	ID3D11VertexShader* m_vertexShader = nullptr;
-	ID3D11InputLayout* m_vsInputLayout = nullptr;
+	ID3D11InputLayout* m_vertexShaderInputLayout = nullptr;
 	ID3D11GeometryShader* m_geometryShader = nullptr;
 	ID3D11Buffer* m_vertexBuffer = nullptr;
-	ID3D11Buffer* m_dummyVertexBuffer = nullptr;
 	std::unique_ptr<DirectX::CommonStates> m_commonStates = nullptr;
 
-	VertexShaderInput m_dummyVertices[96 * 96];
+	ID3D11Buffer* m_dummyVertexBuffer = nullptr;
+	VertexShaderInput* m_dummyVertices = nullptr;
+	int m_dummyVertexCount = 0;
 	// trilinearinterp; clamps on XY, wraps on Z.
 	ID3D11SamplerState* m_samplerState = nullptr;
 
@@ -82,8 +72,5 @@ private:
 	const wchar_t* m_compiledVSPath = L"Shader/generate_rock_VB_VS.cso";
 	const wchar_t* m_compiledGSPath = L"Shader/generate_rock_VB_GS.cso";
 #endif
-
-
-
 };
 

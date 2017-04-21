@@ -9,14 +9,15 @@ Density3DTextureGenerator::Density3DTextureGenerator()
 
 Density3DTextureGenerator::~Density3DTextureGenerator()
 {
-	unloadID3D11Resources();
-	unloadShaders();
-	unloadTextures();
+	releaseID3D11Resources();
+	releaseShaders();
+	releaseTextures();
 }
 
-bool Density3DTextureGenerator::Initialize(ID3D11Device* device)
+bool Density3DTextureGenerator::Initialize(ID3D11Device* device, XMINT3 size)
 {
-	if (!loadID3D11Resources(device))
+	m_texSize = { size.x, size.z, size.y };
+	if (!createID3D11Resources(device))
 	{
 		MessageBox(nullptr, TEXT("Density3DTextureGenerator: Failed to load ID3D11 resources."), TEXT("Error"), MB_OK);
 		return false;
@@ -26,13 +27,13 @@ bool Density3DTextureGenerator::Initialize(ID3D11Device* device)
 		MessageBox(nullptr, TEXT("Density3DTextureGenerator: Failed to load shaders."), TEXT("Error"), MB_OK);
 		return false;
 	}
-	if (!loadTextures(device))
+	if (!createTextures(device))
 	{
 		MessageBox(nullptr, TEXT("Density3DTextureGenerator: Failed to load textures. Is Textures folder in execution folder?"), TEXT("Error"), MB_OK);
 		return false;
 	}
 	m_commonStates = std::make_unique<CommonStates>(device);
-	setViewport(96, 96);
+	setViewport(m_texSize.x, m_texSize.y);
 	return true;
 }
 
@@ -68,7 +69,7 @@ bool Density3DTextureGenerator::Generate(ID3D11DeviceContext* deviceContext)
 	deviceContext->OMSetRenderTargets(1, &m_tex3D_RTV, nullptr);
 	//m_deviceContext->OMSetDepthStencilState(m_depthStencilState, 1);
 
-	deviceContext->DrawInstanced(6, 256, 0, 0);
+	deviceContext->DrawInstanced(6, m_texSize.z, 0, 0);
 	//m_swapChain->Present(0, 0);
 
 
@@ -83,19 +84,19 @@ bool Density3DTextureGenerator::Generate(ID3D11DeviceContext* deviceContext)
 	return true;
 }
 
-bool Density3DTextureGenerator::loadID3D11Resources(ID3D11Device* device)
+bool Density3DTextureGenerator::createID3D11Resources(ID3D11Device* device)
 {
 	D3D11_TEXTURE3D_DESC texDesc;
 	ZeroMemory(&texDesc, sizeof(D3D11_TEXTURE3D_DESC));
-	texDesc.Width = 96; // x axis
-	texDesc.Height = 96; // y axis
-	texDesc.Depth = 256; // z axis
+	texDesc.Width = m_texSize.x; // x axis
+	texDesc.Height = m_texSize.y; // y axis
+	texDesc.Depth = m_texSize.z; // z axis
 	texDesc.MipLevels = 1;
 	texDesc.Format = DXGI_FORMAT_R16_FLOAT;
 	texDesc.Usage = D3D11_USAGE_DEFAULT;
 	texDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
-	//texDesc.CPUAccessFlags = 0;
-	//texDesc.MiscFlags = 0;
+	texDesc.CPUAccessFlags = 0;
+	texDesc.MiscFlags = 0;
 	//
 	//texDesc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
 
@@ -148,7 +149,7 @@ bool Density3DTextureGenerator::loadID3D11Resources(ID3D11Device* device)
 	return true;
 }
 
-void Density3DTextureGenerator::unloadID3D11Resources()
+void Density3DTextureGenerator::releaseID3D11Resources()
 {
 	SafeRelease(m_rasterizerState);
 	SafeRelease(m_tex3D);
@@ -209,7 +210,7 @@ bool Density3DTextureGenerator::loadShaders(ID3D11Device* device)
 	return true;
 }
 
-bool Density3DTextureGenerator::loadTextures(ID3D11Device* device)
+bool Density3DTextureGenerator::createTextures(ID3D11Device* device)
 {
 	for (int i = 0; i < m_noiseTexCount; ++i)
 	{
@@ -224,7 +225,7 @@ bool Density3DTextureGenerator::loadTextures(ID3D11Device* device)
 	return true;
 }
 
-void Density3DTextureGenerator::unloadShaders()
+void Density3DTextureGenerator::releaseShaders()
 {
 	SafeRelease(m_inputLayoutVS);
 	SafeRelease(m_vertexShader);
@@ -232,7 +233,7 @@ void Density3DTextureGenerator::unloadShaders()
 	SafeRelease(m_pixelShader);
 }
 
-void Density3DTextureGenerator::unloadTextures()
+void Density3DTextureGenerator::releaseTextures()
 {
 	for (int i = 0; i < m_noiseTexCount; ++i)
 	{
