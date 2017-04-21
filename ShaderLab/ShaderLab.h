@@ -59,10 +59,10 @@ private:
 
 	POINT m_lastMousePos;
 	Camera m_camera;
-	// Demo parameters
 	SimpleMath::Matrix m_worldMatrix = SimpleMath::Matrix::Identity;;
 
-	/** Density Variables */
+	DirectX::XMINT3 m_rockSize;
+
 	bool m_isDensityTextureGenerated = false;
 	Density3DTextureGenerator m_densityTexGenerator;
 

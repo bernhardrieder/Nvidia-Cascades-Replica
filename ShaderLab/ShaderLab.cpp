@@ -6,7 +6,7 @@
 using namespace DirectX;
 using namespace DirectX::SimpleMath;
 
-ShaderLab::ShaderLab(HINSTANCE hInstance, int nCmdShow): D3D11App(hInstance, nCmdShow)
+ShaderLab::ShaderLab(HINSTANCE hInstance, int nCmdShow) : D3D11App(hInstance, nCmdShow), m_rockSize( 30, 50, 30 )
 {
 }
 
@@ -25,9 +25,10 @@ bool ShaderLab::Initialize()
 		MessageBox(nullptr, TEXT("Failed to load shaders."), TEXT("Error"), MB_OK);
 		return false;
 	}
-	if (!m_densityTexGenerator.Initialize(m_device))
+
+	if (!m_densityTexGenerator.Initialize(m_device, m_rockSize))
 		return false;
-	if (!m_rockVBGenerator.Initialize(m_device))
+	if (!m_rockVBGenerator.Initialize(m_device, m_rockSize))
 		return false;
 
 
@@ -161,23 +162,6 @@ bool ShaderLab::loadShaders()
 		return false;
 
 	SafeRelease(pixelShaderBlob);
-
-	ID3DBlob* geometryShaderBlob;
-#if _DEBUG
-	LPCWSTR compiledGeometryShaderObject = L"Shader/SimpleGeometryShader_d.cso";
-#else
-	LPCWSTR compiledGeometryShaderObject = L"Shader/SimpleGeometryShader.cso";
-#endif
-
-	hr = D3DReadFileToBlob(compiledGeometryShaderObject, &geometryShaderBlob);
-	if (FAILED(hr))
-		return false;
-
-	hr = m_device->CreateGeometryShader(geometryShaderBlob->GetBufferPointer(), geometryShaderBlob->GetBufferSize(), nullptr, &m_simpleGS);
-	if (FAILED(hr))
-		return false;
-
-	SafeRelease(geometryShaderBlob);
 	return true;
 }
 
@@ -236,44 +220,51 @@ void ShaderLab::onMouseMove(WPARAM btnState, int x, int y)
 
 void ShaderLab::checkAndProcessKeyboardInput(float deltaTime)
 {
+	static float cameraSpeed = 10.f;
 	if (GetAsyncKeyState('W') & 0x8000)
-		m_camera.Walk(10.0f * deltaTime);
+		m_camera.Walk(cameraSpeed * deltaTime);
 
 	if (GetAsyncKeyState('S') & 0x8000)
-		m_camera.Walk(-10.0f * deltaTime);
+		m_camera.Walk(-cameraSpeed * deltaTime);
 
 	if (GetAsyncKeyState('A') & 0x8000)
-		m_camera.Strafe(-10.0f * deltaTime);
+		m_camera.Strafe(-cameraSpeed * deltaTime);
 
 	if (GetAsyncKeyState('D') & 0x8000)
-		m_camera.Strafe(10.0f * deltaTime);
+		m_camera.Strafe(cameraSpeed * deltaTime);
 
 	m_camera.UpdateViewMatrix();
 
-	if (GetAsyncKeyState(VK_LEFT) & 0x8000)
-	{
-		//0.00109200052 --> old
-		//0.00003520004410 --> old
-		//0.000432299683
-		m_rockVBGenerator.test_depthStep -= 0.0001f*deltaTime;
-		m_isRockVertexBufferGenerated = false;
-	} 
-	else if (GetAsyncKeyState(VK_RIGHT) & 0x8000)
-	{
-		m_rockVBGenerator.test_depthStep += 0.0001f*deltaTime;
-		m_isRockVertexBufferGenerated = false;
-	}
+	//TODO: ADD rock control FEATURE! -> density & vb generator needs reinit!
+	//rock control
+	//bool buttoLeftPressed = GetAsyncKeyState(VK_LEFT) & 0x8000;
+	//bool buttonRightPressed = GetAsyncKeyState(VK_RIGHT) & 0x8000;
+	//bool buttonUpPressed = GetAsyncKeyState(VK_UP) & 0x8000;
+	//bool buttonDownPressed = GetAsyncKeyState(VK_DOWN) & 0x8000;
+	//if (buttoLeftPressed)
+	//{
+	//	m_rockSize.x -= 1;
+	//	m_rockSize.z -= 1;
+	//} 
+	//else if (buttonRightPressed)
+	//{
+	//	m_rockSize.x += 1;
+	//	m_rockSize.z += 1;
+	//}
 
-	if (GetAsyncKeyState(VK_UP) & 0x8000)
-	{
-		m_rockVBGenerator.test_heightStep += 0.001f*deltaTime;
-		m_isRockVertexBufferGenerated = false;
-	}
-	else if (GetAsyncKeyState(VK_DOWN) & 0x8000)
-	{
-		m_rockVBGenerator.test_heightStep -= 0.001f*deltaTime;
-		m_isRockVertexBufferGenerated = false;
-	}
+	//if (buttonUpPressed)
+	//{
+	//	m_rockSize.y += 1;
+	//}
+	//else if (buttonDownPressed)
+	//{
+	//	m_rockSize.y -= 1;
+	//}
+	//if(buttoLeftPressed || buttonRightPressed || buttonUpPressed || buttonDownPressed)
+	//{
+	//	m_isDensityTextureGenerated = false;
+	//	m_isRockVertexBufferGenerated = false;
+	//}
 }
 
 bool ShaderLab::initDirectX()

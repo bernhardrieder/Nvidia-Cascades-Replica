@@ -1,103 +1,89 @@
-
-#include "generate_rock_globals.hlsli"
-
 struct v2gConnector
 {
-    float4 wsCoord : POSITION; //coords are for the LOWER-LEFT corner of the cell.
-    float3 uvw_3dtex : TEX; //coords are for the LOWER-LEFT corner of the cell.
-    float4 field0123 : TEX1; // the density values
-    float4 field4567 : TEX2; // at the corners
-    uint mc_case : TEX3; // 0-255
+    float3 cubeCorner[8] : POSITION; // corner positions
+    float4 densityValueAtCorners0123 : TEX1; // the density values at the 8 cell corners
+    float4 densityValueAtCorners4567 : TEX2; // the density values at the 8 cell corners
+    uint mc_case : CASE; // 0-255
+    float4 densityTexSize : SIZE;
 };
 
 struct g2vbConnector
 { 
     // Stream out to a VB & save for reuse!
-    // .xyz = wsCoord, .w = occlusion
-    float4 wsCoord_Ambo : SV_POSITION;
+    float4 wsPosition : SV_POSITION;
     float3 wsNormal : NORMAL;
 };
 
-cbuffer g_mc_lut1 : register(b0)
+cbuffer cbPerApp : register(b0)
 {
-    int4 case_to_numpolys[256];
-    float4 cornerAmask0123[12];
-    float4 cornerAmask4567[12];
-    float4 cornerBmask0123[12];
-    float4 cornerBmask4567[12];
-    float4 vec_start[12];
-    float4 vec_dir[12];
+    int4 cb_caseToNumpolys[256];
+    int4 cb_triTable[1280]; // 256*5 = 1280  (256 cases; up to 15 (0/3/6/9/12/15) verts output for each.)
 };
 
-cbuffer g_mc_lut2 : register(b1)
+float3 vertexInterpolation(float3 v0, float3 v1, float l0, float l1)
 {
-    int4 g_triTable[1280]; // 256*5 = 1280  (256 cases; up to 15 (0/3/6/9/12/15) verts output for each.)
-};
-// our volume of density values.
-Texture3D tex;
-// trilinearinterp; clamps on XY, wraps on Z.
-SamplerState s;
-
-float3 ComputeNormal(Texture3D tex, SamplerState s, float3 uvw)
-{
-    float4 step = float4(inv_voxelDim.xyz, 0);
-    float3 gradient = float3(tex.SampleLevel(s, uvw + step.xww, 0).x - tex.SampleLevel(s, uvw - step.xww, 0).x,
-                             tex.SampleLevel(s, uvw + step.wwy, 0).x - tex.SampleLevel(s, uvw - step.wwy, 0).x,
-                             tex.SampleLevel(s, uvw + step.wzw, 0).x - tex.SampleLevel(s, uvw - step.wzw, 0).x);
-    return normalize(-gradient);
+    float isolevel = 0.f;
+    float percent = (isolevel - l0) / (l1 - l0);
+    return lerp(v0, v1, percent);
 }
 
-g2vbConnector PlaceVertOnEdge(v2gConnector input, int edgeNum)
-{ 
-    // get field strengths (via a linear combination of the 8 corner strengths)
-    // @ the two corners that this edge connects, then find how far along 
-    // that edge the strength value hits zero.
-    // Along this cell edge, where does the density value hit zero?
-    float str0 = dot(cornerAmask0123[edgeNum], input.field0123) + 
-                 dot(cornerAmask4567[edgeNum], input.field4567);
-    float str1 = dot(cornerBmask0123[edgeNum], input.field0123) + 
-                 dot(cornerBmask4567[edgeNum], input.field4567);
-    float t = saturate(str0 / (str0 - str1)); //0..1 // 'saturate' keeps occasional crazy stray triangle from appearing @ edges
+float3 calculateNormal(float3 p1, float3 p2, float3 p3)
+{
+    float3 normal;
 
-    // use that to get wsCoord and uvw coords
-    float3 pos_within_cell = saturate(vec_start[edgeNum].xyz + t * vec_dir[edgeNum].xyz); //[0..1]
-    //float3 pos_within_cell = vec_start[edgeNum].xyz + t * vec_dir[edgeNum].xyz; //[0..1]
-    float3 wsCoord = input.wsCoord.xyz + pos_within_cell.xyz * wsVoxelSize;
-    /**cascades demo uses:    */
-    //float3 wsCoord;
-    //wsCoord.xz = input.wsCoord.xz + pos_within_cell.xz*wsVoxelSize.xx;
-    //wsCoord.y = lerp(input.wsCoord.y, input.wsCoord.w, pos_within_cell.y);
+    float3 u = p2 - p1;
+    float3 v = p3 - p1;
 
-    float3 uvw = input.uvw_3dtex + (pos_within_cell * inv_voxelDimMinusOne.xyz).xzy;
+    normal.x = (u.y * v.z) - (u.z * v.y);
+    normal.y = (u.z * v.x) - (u.x * v.z);
+    normal.z = (u.x * v.y) - (u.y * v.x);
 
-    g2vbConnector output;
-    output.wsCoord_Ambo.xyz = wsCoord;
-    //output.wsCoord_Ambo.w = grad_ambo_tex.SampleLevel(s, uvw, 0).w;
-    output.wsCoord_Ambo.w = 0.f; //DUMMY
-
-    output.wsNormal = ComputeNormal(tex, s, uvw);
-    //output.wsNormal = float3(0, 0, 0); // dummy
-
-    return output;
+    return normal;
 }
-
 
 [maxvertexcount(15)]
 void main(point v2gConnector input[1], inout TriangleStream<g2vbConnector> outStream)
 {
-    g2vbConnector output;
-    uint num_polys = case_to_numpolys[input[0].mc_case].x;
-    uint table_pos = input[0].mc_case * 5;
-    for (uint p = 0; p < num_polys; p++)
+    if (input[0].mc_case != 0 && input[0].mc_case != 255)
     {
-        int4 polydata = g_triTable[table_pos++];
-        output = PlaceVertOnEdge(input[0], polydata.x);
-        outStream.Append(output);
-        output = PlaceVertOnEdge(input[0], polydata.y);
-        outStream.Append(output);
-        output = PlaceVertOnEdge(input[0], polydata.z);
-        outStream.Append(output);
-        outStream.RestartStrip();
+        float3 edgeVertexList[12];
+        float3 cubeCorner[8] = input[0].cubeCorner;
+        float4 densityValueAtCorners0123 = input[0].densityValueAtCorners0123;
+        float4 densityValueAtCorners4567 = input[0].densityValueAtCorners4567;
+
+        edgeVertexList[0] = vertexInterpolation(cubeCorner[0], cubeCorner[1], densityValueAtCorners0123.x, densityValueAtCorners0123.y);
+        edgeVertexList[1] = vertexInterpolation(cubeCorner[1], cubeCorner[2], densityValueAtCorners0123.y, densityValueAtCorners0123.z);
+        edgeVertexList[2] = vertexInterpolation(cubeCorner[2], cubeCorner[3], densityValueAtCorners0123.z, densityValueAtCorners0123.w);
+        edgeVertexList[3] = vertexInterpolation(cubeCorner[3], cubeCorner[0], densityValueAtCorners0123.w, densityValueAtCorners0123.x);
+        edgeVertexList[4] = vertexInterpolation(cubeCorner[4], cubeCorner[5], densityValueAtCorners4567.x, densityValueAtCorners4567.y);
+        edgeVertexList[5] = vertexInterpolation(cubeCorner[5], cubeCorner[6], densityValueAtCorners4567.y, densityValueAtCorners4567.z);
+        edgeVertexList[6] = vertexInterpolation(cubeCorner[6], cubeCorner[7], densityValueAtCorners4567.z, densityValueAtCorners4567.w);
+        edgeVertexList[7] = vertexInterpolation(cubeCorner[7], cubeCorner[4], densityValueAtCorners4567.w, densityValueAtCorners4567.x);
+        edgeVertexList[8] = vertexInterpolation(cubeCorner[0], cubeCorner[4], densityValueAtCorners0123.x, densityValueAtCorners4567.x);
+        edgeVertexList[9] = vertexInterpolation(cubeCorner[1], cubeCorner[5], densityValueAtCorners0123.y, densityValueAtCorners4567.y);
+        edgeVertexList[10] = vertexInterpolation(cubeCorner[2], cubeCorner[6], densityValueAtCorners0123.z, densityValueAtCorners4567.z);
+        edgeVertexList[11] = vertexInterpolation(cubeCorner[3], cubeCorner[7], densityValueAtCorners0123.w, densityValueAtCorners4567.w);
+        
+        g2vbConnector output;
+        output.wsNormal = float3(0, 0, 0);
+
+        uint num_polys = cb_caseToNumpolys[input[0].mc_case].x;
+        uint table_pos = input[0].mc_case * 5;
+
+        for (uint tri = 0; tri < num_polys; ++tri)
+        {
+            int4 triData = cb_triTable[table_pos++];
+            
+            for (int vertexIndex = 0; vertexIndex < 3; ++vertexIndex)
+            {
+                output.wsPosition = float4(edgeVertexList[triData[vertexIndex]], 1.f).xzyw;
+                output.wsPosition.y *= (2.0f * (input[0].densityTexSize.y / input[0].densityTexSize.x)); // WorldSpaceVolumeHeight -> scale to real position with height == 1
+                output.wsNormal = calculateNormal(edgeVertexList[triData.x], edgeVertexList[triData.y], edgeVertexList[triData.z]);
+                outStream.Append(output);
+            }
+            
+            outStream.RestartStrip();
+        }
     }
 }
 

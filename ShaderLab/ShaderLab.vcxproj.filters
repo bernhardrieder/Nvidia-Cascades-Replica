@@ -113,8 +113,5 @@
     <None Include="Shader\inoise.hlsli">
       <Filter>Shader</Filter>
     </None>
-    <None Include="Shader\generate_rock_globals.hlsli">
-      <Filter>Shader</Filter>
-    </None>
   </ItemGroup>
 </Project>

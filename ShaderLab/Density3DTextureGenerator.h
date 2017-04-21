@@ -7,18 +7,18 @@ public:
 	Density3DTextureGenerator();
 	~Density3DTextureGenerator();
 
-	bool Initialize(ID3D11Device* device);
+	bool Initialize(ID3D11Device* device, DirectX::XMINT3 textureSize);
 	bool Generate(ID3D11DeviceContext* pDeviceContext);
 	ID3D11Texture3D* GetTexture3D() const { return m_tex3D; }
 	ID3D11ShaderResourceView* GetTexture3DShaderResourceView() const { return m_tex3D_SRV; }
 
 private:
-	bool loadID3D11Resources(ID3D11Device* device);
+	bool createID3D11Resources(ID3D11Device* device);
 	bool loadShaders(ID3D11Device* device);
-	bool loadTextures(ID3D11Device* device);
-	void unloadID3D11Resources();
-	void unloadShaders();
-	void unloadTextures();
+	bool createTextures(ID3D11Device* device);
+	void releaseID3D11Resources();
+	void releaseShaders();
+	void releaseTextures();
 	void setViewport(FLOAT width, FLOAT height);
 
 	struct VertexPos
@@ -34,6 +34,8 @@ private:
 		{ DirectX::XMFLOAT3(1.0f, 1.0f, 0.0f) }, // 4
 		{ DirectX::XMFLOAT3(1.0f, -1.0f, 0.0f) } // 5
 	};
+
+	DirectX::XMINT3 m_texSize;
 
 	ID3D11RasterizerState* m_rasterizerState = nullptr;
 	D3D11_VIEWPORT m_viewport = { 0 };
