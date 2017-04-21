@@ -11,7 +11,6 @@ Density3DTextureGenerator::~Density3DTextureGenerator()
 {
 	releaseID3D11Resources();
 	releaseShaders();
-	releaseTextures();
 }
 
 bool Density3DTextureGenerator::Initialize(ID3D11Device* device, XMINT3 size)
@@ -27,12 +26,6 @@ bool Density3DTextureGenerator::Initialize(ID3D11Device* device, XMINT3 size)
 		MessageBox(nullptr, TEXT("Density3DTextureGenerator: Failed to load shaders."), TEXT("Error"), MB_OK);
 		return false;
 	}
-	if (!createTextures(device))
-	{
-		MessageBox(nullptr, TEXT("Density3DTextureGenerator: Failed to load textures. Is Textures folder in execution folder?"), TEXT("Error"), MB_OK);
-		return false;
-	}
-	m_commonStates = std::make_unique<CommonStates>(device);
 	setViewport(m_texSize.x, m_texSize.y);
 	return true;
 }
@@ -40,38 +33,26 @@ bool Density3DTextureGenerator::Initialize(ID3D11Device* device, XMINT3 size)
 bool Density3DTextureGenerator::Generate(ID3D11DeviceContext* deviceContext)
 {
 	deviceContext->ClearRenderTargetView(m_tex3D_RTV, Colors::White);
-	//m_deviceContext->ClearDepthStencilView(m_depthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 
 	const UINT vertexStride = sizeof(VertexPos);
 	const UINT offset = 0;
 
-	deviceContext->IASetInputLayout(m_inputLayoutVS);
+	deviceContext->IASetInputLayout(m_vertexShaderInputLayout);
 	deviceContext->IASetVertexBuffers(0, 1, &m_renderPortalvertexBuffer, &vertexStride, &offset);
 	deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-
 	deviceContext->VSSetShader(m_vertexShader, nullptr, 0);
-	//m_deviceContext->VSSetConstantBuffers(0, 3, m_constantBuffers);
 
 	deviceContext->GSSetShader(m_geometryShader, nullptr, 0);
 
-	//rasterizer
 	deviceContext->RSSetState(m_rasterizerState);
 	deviceContext->RSSetViewports(1, &m_viewport);
 
 	deviceContext->PSSetShader(m_pixelShader, nullptr, 0);
-	deviceContext->PSSetShaderResources(0, m_noiseTexCount, m_noiseTexSRV);
 
-	auto samplerState = m_commonStates->LinearWrap();
-	deviceContext->PSSetSamplers(0, 1, &samplerState);
-
-	//output merger
 	deviceContext->OMSetRenderTargets(1, &m_tex3D_RTV, nullptr);
-	//m_deviceContext->OMSetDepthStencilState(m_depthStencilState, 1);
 
 	deviceContext->DrawInstanced(6, m_texSize.z, 0, 0);
-	//m_swapChain->Present(0, 0);
-
 
 	/** RESET */
 	deviceContext->VSSetShader(nullptr, nullptr, 0);
@@ -88,24 +69,19 @@ bool Density3DTextureGenerator::createID3D11Resources(ID3D11Device* device)
 {
 	D3D11_TEXTURE3D_DESC texDesc;
 	ZeroMemory(&texDesc, sizeof(D3D11_TEXTURE3D_DESC));
-	texDesc.Width = m_texSize.x; // x axis
-	texDesc.Height = m_texSize.y; // y axis
-	texDesc.Depth = m_texSize.z; // z axis
+	texDesc.Width = m_texSize.x;
+	texDesc.Height = m_texSize.y;
+	texDesc.Depth = m_texSize.z;
 	texDesc.MipLevels = 1;
 	texDesc.Format = DXGI_FORMAT_R16_FLOAT;
 	texDesc.Usage = D3D11_USAGE_DEFAULT;
 	texDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
 	texDesc.CPUAccessFlags = 0;
 	texDesc.MiscFlags = 0;
-	//
-	//texDesc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
 
 	HRESULT hr = device->CreateTexture3D(&texDesc, nullptr, &m_tex3D);
 	if (FAILED(hr))
 		return false;
-
-	// Give the buffer a useful name
-	//m_tex3D->SetPrivateData(WKPDID_D3DDebugObjectName, sizeof("Density Texture"), "Density Texture");
 
 	D3D11_RENDER_TARGET_VIEW_DESC rtvDesc;
 	ZeroMemory(&rtvDesc, sizeof(D3D11_RENDER_TARGET_VIEW_DESC));
@@ -182,7 +158,7 @@ bool Density3DTextureGenerator::loadShaders(ID3D11Device* device)
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(VertexPos,Position), D3D11_INPUT_PER_VERTEX_DATA, 0 }
 	};
 
-	HR_VS = device->CreateInputLayout(vertexLayoutDesc, _countof(vertexLayoutDesc), vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), &m_inputLayoutVS);
+	HR_VS = device->CreateInputLayout(vertexLayoutDesc, _countof(vertexLayoutDesc), vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), &m_vertexShaderInputLayout);
 	if (FAILED(HR_VS))
 		return false;
 
@@ -210,35 +186,12 @@ bool Density3DTextureGenerator::loadShaders(ID3D11Device* device)
 	return true;
 }
 
-bool Density3DTextureGenerator::createTextures(ID3D11Device* device)
-{
-	for (int i = 0; i < m_noiseTexCount; ++i)
-	{
-		// Load the texture in.
-		auto filename = (m_noiseTexPathPrefix + m_noiseTexFilename[i]);
-		HRESULT hr = CreateDDSTextureFromFile(device, filename.c_str(), nullptr, &m_noiseTexSRV[i]);
-
-		if (FAILED(hr))
-			return false;
-	}
-
-	return true;
-}
-
 void Density3DTextureGenerator::releaseShaders()
 {
-	SafeRelease(m_inputLayoutVS);
+	SafeRelease(m_vertexShaderInputLayout);
 	SafeRelease(m_vertexShader);
 	SafeRelease(m_geometryShader);
 	SafeRelease(m_pixelShader);
-}
-
-void Density3DTextureGenerator::releaseTextures()
-{
-	for (int i = 0; i < m_noiseTexCount; ++i)
-	{
-		SafeRelease(m_noiseTexSRV[i]);
-	}
 }
 
 void Density3DTextureGenerator::setViewport(FLOAT width, FLOAT height)

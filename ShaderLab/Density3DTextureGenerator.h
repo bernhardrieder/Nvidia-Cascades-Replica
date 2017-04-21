@@ -15,10 +15,8 @@ public:
 private:
 	bool createID3D11Resources(ID3D11Device* device);
 	bool loadShaders(ID3D11Device* device);
-	bool createTextures(ID3D11Device* device);
 	void releaseID3D11Resources();
 	void releaseShaders();
-	void releaseTextures();
 	void setViewport(FLOAT width, FLOAT height);
 
 	struct VertexPos
@@ -44,7 +42,7 @@ private:
 	ID3D11RenderTargetView* m_tex3D_RTV = nullptr;
 	ID3D11ShaderResourceView* m_tex3D_SRV = nullptr;
 
-	ID3D11InputLayout* m_inputLayoutVS = nullptr;
+	ID3D11InputLayout* m_vertexShaderInputLayout = nullptr;
 	ID3D11Buffer* m_renderPortalvertexBuffer = nullptr;
 	ID3D11VertexShader* m_vertexShader = nullptr;
 	ID3D11GeometryShader* m_geometryShader = nullptr;
@@ -59,11 +57,4 @@ private:
 	const wchar_t* m_compiledGSPath = L"Shader/create_density_tex3d_GS.cso";
 	const wchar_t* m_compiledPSPath = L"Shader/create_density_tex3d_PS.cso";
 #endif
-
-	std::unique_ptr<DirectX::CommonStates> m_commonStates;
-	const size_t m_noiseTexCount = 8;
-	ID3D11ShaderResourceView* m_noiseTexSRV[8];
-	const std::wstring m_noiseTexPathPrefix = L"Textures/Noise/";
-	const std::wstring m_noiseTexFilename[8] = { L"lichen1_disp.dds", L"lichen2_disp.dds", L"lichen3_disp.dds", L"lichen4_disp.dds",
-		L"lichen5_disp.dds", L"lichen6_disp.dds", L"lichen7_disp.dds", L"lichen8_disp.dds" };
 };
