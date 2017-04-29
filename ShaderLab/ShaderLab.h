@@ -4,6 +4,7 @@
 #include <CommonStates.h>
 #include "RockVertexBufferGenerator.h"
 #include "Density3DTextureGenerator.h"
+#include <SimpleMath.h>
 
 using namespace DirectX;
 
@@ -29,6 +30,9 @@ private:
 	void checkAndProcessKeyboardInput(float deltaTime);
 	bool initDirectX() override;
 	void cleanup() override;
+
+	bool createTextures(ID3D11Device* device);
+	void releaseTextures();
 
 private:
 	// Shader resources
@@ -68,4 +72,12 @@ private:
 
 	bool m_isRockVertexBufferGenerated = false;
 	RockVertexBufferGenerator m_rockVBGenerator;
+
+	
+	const size_t m_textureCount = 5;
+	std::vector<ID3D11ShaderResourceView*> m_texturesSRVs;
+	std::wstring m_textureFilesPath = L"Assets/Textures/";
+	std::wstring m_textureGenericFilename = L"lichen";
+	std::wstring m_textureFilenameExtension = L".dds";
+
 };

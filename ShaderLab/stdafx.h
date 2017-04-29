@@ -44,6 +44,7 @@ inline void SafeRelease(T& ptr)
 	}
 }
 
+#include <vector>
 #include <memory>
 #include <wchar.h>
 #include <exception>

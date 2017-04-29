@@ -6,7 +6,7 @@
 using namespace DirectX;
 using namespace DirectX::SimpleMath;
 
-ShaderLab::ShaderLab(HINSTANCE hInstance, int nCmdShow) : D3D11App(hInstance, nCmdShow), m_rockSize( 30, 50, 30 )
+ShaderLab::ShaderLab(HINSTANCE hInstance, int nCmdShow) : D3D11App(hInstance, nCmdShow), m_rockSize(30, 100, 30)
 {
 }
 
@@ -14,6 +14,7 @@ ShaderLab::~ShaderLab()
 {
 	ShaderLab::cleanup();
 	unloadShaders();
+	releaseTextures();
 }
 
 bool ShaderLab::Initialize()
@@ -31,22 +32,28 @@ bool ShaderLab::Initialize()
 	if (!m_rockVBGenerator.Initialize(m_device, m_rockSize))
 		return false;
 
+	if (!createTextures(m_device))
+	{
+		MessageBox(nullptr, TEXT("Failed to load textures. Is Assets/Textures folder in execution folder?"), TEXT("Error"), MB_OK);
+		return false;
+	}
+
 
 	m_commonStates = std::make_unique<CommonStates>(m_device);
-	m_camera.SetPosition(0., 0.0f,-20.f);
+	m_camera.SetPosition(0., 0.0f, -20.f);
 	onResize();
 	m_camera.LookAt(Vector3::Up, Vector3(0, 10, 0) - m_camera.GetPosition());
 	m_camera.UpdateViewMatrix();
 
 	m_worldMatrix = Matrix::CreateWorld(Vector3(0, 0, 0), Vector3::Forward, Vector3::Up);
-	m_worldMatrix *= Matrix::CreateScale(10,10,10);
+	m_worldMatrix *= Matrix::CreateScale(10, 10, 10);
 	return true;
 }
 
 void ShaderLab::update(float deltaTime)
 {
 	checkAndProcessKeyboardInput(deltaTime);
-	
+
 	auto viewMatrix = m_camera.GetView();
 	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Frame], 0, nullptr, &viewMatrix, 0, 0);
 	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Object], 0, nullptr, &m_worldMatrix, 0, 0);
@@ -59,7 +66,7 @@ void ShaderLab::render(float deltaTime)
 
 	if (!m_isDensityTextureGenerated)
 		m_isDensityTextureGenerated = m_densityTexGenerator.Generate(m_deviceContext);
-	
+
 	if (m_isDensityTextureGenerated && !m_isRockVertexBufferGenerated)
 		m_isRockVertexBufferGenerated = m_rockVBGenerator.Generate(m_deviceContext, m_densityTexGenerator.GetTexture3DShaderResourceView());
 
@@ -88,7 +95,7 @@ void ShaderLab::render(float deltaTime)
 
 	m_deviceContext->OMSetRenderTargets(1, &m_renderTargetView, m_depthStencilView);
 	m_deviceContext->OMSetDepthStencilState(m_depthStencilState, 1);
-	
+
 	m_deviceContext->DrawAuto();
 
 	//Present Frame!!
@@ -278,4 +285,28 @@ bool ShaderLab::initDirectX()
 void ShaderLab::cleanup()
 {
 	D3D11App::cleanup();
+}
+
+bool ShaderLab::createTextures(ID3D11Device* device)
+{
+	m_texturesSRVs.resize(m_textureCount);
+	for (int i = 1; i < m_textureCount + 1; ++i)
+	{
+		// Load the texture in.
+		auto filename = (m_textureFilesPath + m_textureGenericFilename + std::to_wstring(i) + m_textureFilenameExtension);
+		HRESULT hr = CreateDDSTextureFromFile(device, filename.c_str(), nullptr, &m_texturesSRVs[i - 1]);
+
+		if (FAILED(hr))
+			return false;
+	}
+
+	return true;
+}
+
+void ShaderLab::releaseTextures()
+{
+	for (auto a : m_texturesSRVs)
+	{
+		SafeRelease(a);
+	}
 }
