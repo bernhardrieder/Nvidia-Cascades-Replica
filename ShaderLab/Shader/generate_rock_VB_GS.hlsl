@@ -64,8 +64,7 @@ void main(point v2gConnector input[1], inout TriangleStream<g2vbConnector> outSt
         edgeVertexList[10] = vertexInterpolation(cubeCorner[2], cubeCorner[6], densityValueAtCorners0123.z, densityValueAtCorners4567.z);
         edgeVertexList[11] = vertexInterpolation(cubeCorner[3], cubeCorner[7], densityValueAtCorners0123.w, densityValueAtCorners4567.w);
         
-        g2vbConnector output;
-        output.wsNormal = float3(0, 0, 0);
+        g2vbConnector output[3];
 
         uint num_polys = cb_caseToNumpolys[input[0].mc_case].x;
         uint table_pos = input[0].mc_case * 5;
@@ -74,12 +73,20 @@ void main(point v2gConnector input[1], inout TriangleStream<g2vbConnector> outSt
         {
             int4 triData = cb_triTable[table_pos++];
             
-            for (int vertexIndex = 0; vertexIndex < 3; ++vertexIndex)
+            int vertexIndex = 0;
+            // calculate worldspace Position
+            for (vertexIndex = 0; vertexIndex < 3; ++vertexIndex)
             {
-                output.wsPosition = float4(edgeVertexList[triData[vertexIndex]], 1.f).xzyw;
-                output.wsPosition.y *= (2.0f * (input[0].densityTexSize.y / input[0].densityTexSize.x)); // WorldSpaceVolumeHeight -> scale to real position with height == 1
-                output.wsNormal = calculateNormal(edgeVertexList[triData.x], edgeVertexList[triData.y], edgeVertexList[triData.z]);
-                outStream.Append(output);
+                output[vertexIndex].wsPosition = float4(edgeVertexList[triData[vertexIndex]], 0.1f).xzyw;
+                output[vertexIndex].wsPosition.y *= (2.0f * (input[0].densityTexSize.y / input[0].densityTexSize.x)); // WorldSpaceVolumeHeight -> scale to real position with height == 1
+            }
+
+            //calculate normal 
+            for (vertexIndex = 0; vertexIndex < 3; ++vertexIndex)
+            {
+                //output[vertexIndex].wsNormal = calculateNormal(edgeVertexList[triData.x], edgeVertexList[triData.y], edgeVertexList[triData.z]);
+                output[vertexIndex].wsNormal = calculateNormal(output[0].wsPosition.xyz, output[1].wsPosition.xyz, output[2].wsPosition.xyz);
+                outStream.Append(output[vertexIndex]);
             }
             
             outStream.RestartStrip();

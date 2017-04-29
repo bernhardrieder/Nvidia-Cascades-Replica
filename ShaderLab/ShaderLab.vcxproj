@@ -143,6 +143,7 @@
     <ClInclude Include="D3D11App.h" />
     <ClInclude Include="Density3DTextureGenerator.h" />
     <ClInclude Include="LookUpTables.h" />
+    <ClInclude Include="MathHelper.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="RockVertexBufferGenerator.h" />
     <ClInclude Include="ShaderLab.h" />

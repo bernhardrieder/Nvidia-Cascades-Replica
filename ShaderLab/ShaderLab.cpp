@@ -46,7 +46,7 @@ bool ShaderLab::Initialize()
 	m_camera.UpdateViewMatrix();
 
 	m_worldMatrix = Matrix::CreateWorld(Vector3(0, 0, 0), Vector3::Forward, Vector3::Up);
-	m_worldMatrix *= Matrix::CreateScale(10, 10, 10);
+	m_worldMatrix *= Matrix::CreateScale(15, 10, 15);
 	return true;
 }
 
@@ -55,7 +55,10 @@ void ShaderLab::update(float deltaTime)
 	checkAndProcessKeyboardInput(deltaTime);
 
 	auto viewMatrix = m_camera.GetView();
-	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Frame], 0, nullptr, &viewMatrix, 0, 0);
+	m_cbPerFrame.ViewMatrix = viewMatrix;
+	m_cbPerFrame.SunLightDirection = -MathHelper::SphericalToCartesian(1.0f, m_sunTheta, m_sunPhi);
+	
+	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Frame], 0, nullptr, &m_cbPerFrame, 0, 0);
 	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Object], 0, nullptr, &m_worldMatrix, 0, 0);
 }
 
@@ -87,16 +90,21 @@ void ShaderLab::render(float deltaTime)
 	m_deviceContext->GSSetShader(nullptr, nullptr, 0);
 
 	auto wireframe = m_commonStates->Wireframe();
-	m_deviceContext->RSSetState(wireframe);
-	//m_deviceContext->RSSetState(m_rasterizerState);
+	//m_deviceContext->RSSetState(wireframe);
+	m_deviceContext->RSSetState(m_rasterizerState);
 	m_deviceContext->RSSetViewports(1, &m_viewport);
 
 	m_deviceContext->PSSetShader(m_simplePS, nullptr, 0);
+	m_deviceContext->PSSetConstantBuffers(0, 1, &m_constantBuffers[CB_Frame]);
 
 	m_deviceContext->OMSetRenderTargets(1, &m_renderTargetView, m_depthStencilView);
 	m_deviceContext->OMSetDepthStencilState(m_depthStencilState, 1);
 
 	m_deviceContext->DrawAuto();
+
+
+	//m_deviceContext->GSSetShader(m_simpleGS, nullptr, 0);
+	//m_deviceContext->DrawAuto();
 
 	//Present Frame!!
 	m_swapChain->Present(0, 0);
@@ -109,7 +117,7 @@ bool ShaderLab::loadShaders()
 	ZeroMemory(&constantBufferDesc, sizeof(D3D11_BUFFER_DESC));
 
 	constantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-	constantBufferDesc.ByteWidth = sizeof(XMMATRIX);
+	constantBufferDesc.ByteWidth = sizeof(FrameConstantBuffer);
 	constantBufferDesc.CPUAccessFlags = 0;
 	constantBufferDesc.Usage = D3D11_USAGE_DEFAULT;
 
@@ -180,15 +188,13 @@ void ShaderLab::unloadShaders()
 	SafeRelease(m_inputLayoutSimpleVS);
 	SafeRelease(m_simpleVS);
 	SafeRelease(m_simplePS);
-	SafeRelease(m_simpleGS);
 }
 
 void ShaderLab::onResize()
 {
-	static float pi = 3.1415926535f; // cmath include isn't working?!?!
 	D3D11App::onResize();
 	// The window resized, so update the aspect ratio and recompute the projection matrix.
-	m_camera.SetLens(.5f * pi, AspectRatio(), .1f, 10000.0f);
+	m_camera.SetLens(.5f * XM_PI, AspectRatio(), .1f, 10000.0f);
 	auto proj = m_camera.GetProj();
 	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Appliation], 0, nullptr, &proj, 0, 0);
 }
@@ -242,36 +248,20 @@ void ShaderLab::checkAndProcessKeyboardInput(float deltaTime)
 
 	m_camera.UpdateViewMatrix();
 
-	//TODO: ADD rock control FEATURE! -> density & vb generator needs reinit!
-	//rock control
-	//bool buttoLeftPressed = GetAsyncKeyState(VK_LEFT) & 0x8000;
-	//bool buttonRightPressed = GetAsyncKeyState(VK_RIGHT) & 0x8000;
-	//bool buttonUpPressed = GetAsyncKeyState(VK_UP) & 0x8000;
-	//bool buttonDownPressed = GetAsyncKeyState(VK_DOWN) & 0x8000;
-	//if (buttoLeftPressed)
-	//{
-	//	m_rockSize.x -= 1;
-	//	m_rockSize.z -= 1;
-	//} 
-	//else if (buttonRightPressed)
-	//{
-	//	m_rockSize.x += 1;
-	//	m_rockSize.z += 1;
-	//}
+	//SUN ROTATION
+	if (GetAsyncKeyState(VK_LEFT) & 0x8000)
+		m_sunTheta -= 1.0f*deltaTime;
 
-	//if (buttonUpPressed)
-	//{
-	//	m_rockSize.y += 1;
-	//}
-	//else if (buttonDownPressed)
-	//{
-	//	m_rockSize.y -= 1;
-	//}
-	//if(buttoLeftPressed || buttonRightPressed || buttonUpPressed || buttonDownPressed)
-	//{
-	//	m_isDensityTextureGenerated = false;
-	//	m_isRockVertexBufferGenerated = false;
-	//}
+	if (GetAsyncKeyState(VK_RIGHT) & 0x8000)
+		m_sunTheta += 1.0f*deltaTime;
+
+	if (GetAsyncKeyState(VK_UP) & 0x8000)
+		m_sunPhi += 1.0f*deltaTime;
+
+	if (GetAsyncKeyState(VK_DOWN) & 0x8000)
+		m_sunPhi -= 1.0f*deltaTime;
+
+	m_sunPhi = MathHelper::Clamp(m_sunPhi, 0.1f, XM_PIDIV2);
 }
 
 bool ShaderLab::initDirectX()

@@ -5,7 +5,18 @@ struct v2pConnector
     float3 normal : NORMAL;
 };
 
+cbuffer PerFrame : register(b0)
+{
+    matrix viewMatrix; //unused in this shader
+    float4 sunLightDirection;
+}
+
 float4 main(v2pConnector v2p) : SV_Target
 {
-    return float4(v2p.color.xyz, 1.0f);
+    //simple lightning function
+    float4 lightIntensity = dot(sunLightDirection.xyz, v2p.normal) * 100;
+    float4 color = saturate(lightIntensity * v2p.color);
+    float4 ambient = (0.1f * v2p.color);
+    color = normalize(float4(color.xyz, 1) + ambient);
+    return color;
 }

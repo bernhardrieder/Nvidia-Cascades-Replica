@@ -33,7 +33,6 @@ private:
 
 	bool createTextures(ID3D11Device* device);
 	void releaseTextures();
-
 private:
 	// Shader resources
 	enum ShaderConstanBufferType
@@ -47,9 +46,19 @@ private:
 	// Vertex data for a colored cube.
 	struct VertexPosNormal
 	{
-		XMFLOAT3 Position;
+		XMFLOAT4 Position;
 		XMFLOAT3 Normal;
 	};
+
+	struct FrameConstantBuffer
+	{
+		XMMATRIX ViewMatrix;
+		XMVECTOR SunLightDirection;
+	};
+
+	FrameConstantBuffer m_cbPerFrame;
+	float m_sunTheta = -1.4f* DirectX::XM_PI;
+	float m_sunPhi = DirectX::XM_PIDIV2;
 
 	// Vertex buffer data
 	ID3D11InputLayout* m_inputLayoutSimpleVS = nullptr;
@@ -57,7 +66,6 @@ private:
 	// Shader data
 	ID3D11VertexShader* m_simpleVS = nullptr;
 	ID3D11PixelShader* m_simplePS = nullptr;
-	ID3D11GeometryShader* m_simpleGS = nullptr;
 	ID3D11Buffer* m_constantBuffers[NumConstantBuffers];
 	std::unique_ptr<DirectX::CommonStates> m_commonStates;
 
@@ -72,12 +80,10 @@ private:
 
 	bool m_isRockVertexBufferGenerated = false;
 	RockVertexBufferGenerator m_rockVBGenerator;
-
 	
 	const size_t m_textureCount = 5;
 	std::vector<ID3D11ShaderResourceView*> m_texturesSRVs;
 	std::wstring m_textureFilesPath = L"Assets/Textures/";
 	std::wstring m_textureGenericFilename = L"lichen";
 	std::wstring m_textureFilenameExtension = L".dds";
-
 };

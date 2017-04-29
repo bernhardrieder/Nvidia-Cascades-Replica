@@ -48,6 +48,7 @@ inline void SafeRelease(T& ptr)
 #include <memory>
 #include <wchar.h>
 #include <exception>
+#include "MathHelper.h"
 #include "D3D11App.h"
 #define _USE_MATH_DEFINES
 #include <cmath>

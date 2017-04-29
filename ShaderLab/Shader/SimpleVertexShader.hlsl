@@ -19,6 +19,7 @@ cbuffer PerApplication : register(b0)
 cbuffer PerFrame : register(b1)
 {
     matrix viewMatrix;
+    float4 sunLightDirection; //unused in this shader
 }
 
 cbuffer PerObject : register(b2)
@@ -30,8 +31,8 @@ v2pConnector main(a2vConnector a2v)
 {
     v2pConnector v2p;
 
-    matrix mvp = mul(projectionMatrix, mul(viewMatrix, worldMatrix));
-    v2p.pos = mul(mvp, float4(a2v.wsPosition.xyz, 1.f));
+    matrix worldViewProj = mul(projectionMatrix, mul(viewMatrix, worldMatrix));
+    v2p.pos = mul(worldViewProj, float4(a2v.wsPosition.xyz, 1.f));
     v2p.color = float4(1.f, 0.f, 0.f, 1.0f);
     v2p.normal = a2v.wsNormal;
 
