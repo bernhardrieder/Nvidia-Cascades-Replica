@@ -33,6 +33,8 @@ private:
 
 	bool createTextures(ID3D11Device* device);
 	void releaseTextures();
+	bool createSampler(ID3D11Device* device);
+	void releaseSample();
 private:
 	// Shader resources
 	enum ShaderConstanBufferType
@@ -96,7 +98,8 @@ private:
 	bool m_isRockVertexBufferGenerated = false;
 	RockVertexBufferGenerator m_rockVBGenerator;
 	
-	const size_t m_textureCount = 5;
+	ID3D11SamplerState* m_lichenSampler = nullptr;
+	const size_t m_textureCount = 19;
 	std::vector<ID3D11ShaderResourceView*> m_texturesSRVs;
 	std::wstring m_textureFilesPath = L"Assets/Textures/";
 	std::wstring m_textureGenericFilename = L"lichen";

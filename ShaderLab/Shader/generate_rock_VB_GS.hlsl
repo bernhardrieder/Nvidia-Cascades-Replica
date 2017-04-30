@@ -38,6 +38,7 @@ float3 calculateNormal(float3 p1, float3 p2, float3 p3)
     normal.y = (u.z * v.x) - (u.x * v.z);
     normal.z = (u.x * v.y) - (u.y * v.x);
 
+    normal = normalize(normal);
     return normal;
 }
 

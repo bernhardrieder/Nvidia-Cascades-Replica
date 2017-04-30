@@ -38,6 +38,11 @@ bool ShaderLab::Initialize()
 		MessageBox(nullptr, TEXT("Failed to load textures. Is Assets/Textures folder in execution folder?"), TEXT("Error"), MB_OK);
 		return false;
 	}
+	if(!createSampler(m_device))
+	{
+		MessageBox(nullptr, TEXT("Failed create SamplerStates!"), TEXT("Error"), MB_OK);
+		return false;
+	}
 
 
 	m_commonStates = std::make_unique<CommonStates>(m_device);
@@ -100,6 +105,12 @@ void ShaderLab::render(float deltaTime)
 
 	m_deviceContext->PSSetShader(m_simplePS, nullptr, 0);
 	m_deviceContext->PSSetConstantBuffers(0, 1, &m_constantBuffers[CB_Frame]);
+	auto sampler = m_commonStates->PointWrap();
+	m_deviceContext->PSSetSamplers(0, 1, &m_lichenSampler);
+	m_deviceContext->PSSetShaderResources(0, 1, &m_texturesSRVs[0]);
+	m_deviceContext->PSSetShaderResources(1, 1, &m_texturesSRVs[3]);
+	m_deviceContext->PSSetShaderResources(2, 1, &m_texturesSRVs[18]);
+
 
 	m_deviceContext->OMSetRenderTargets(1, &m_renderTargetView, m_depthStencilView);
 	m_deviceContext->OMSetDepthStencilState(m_depthStencilState, 1);
@@ -290,4 +301,30 @@ void ShaderLab::releaseTextures()
 	{
 		SafeRelease(a);
 	}
+}
+
+bool ShaderLab::createSampler(ID3D11Device* device)
+{
+	D3D11_SAMPLER_DESC desc;
+	ZeroMemory(&desc, sizeof(D3D11_SAMPLER_DESC));
+	desc.Filter = D3D11_FILTER_ANISOTROPIC;
+	desc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+	desc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+	desc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+
+	//from dxtk commonstates
+	//desc.MaxAnisotropy = 16;
+	//desc.MaxLOD = FLT_MAX;
+	//desc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+	
+
+	HRESULT hr = device->CreateSamplerState(&desc, &m_lichenSampler);
+	if (FAILED(hr))
+		return false;
+	return true;
+}
+
+void ShaderLab::releaseSample()
+{
+	SafeRelease(m_lichenSampler);
 }

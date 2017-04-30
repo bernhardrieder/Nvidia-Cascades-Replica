@@ -1,7 +1,7 @@
 struct a2vConnector
 {
-    float4 wsPosition : POSITION; //local position
-    float3 wsNormal : NORMAL; //local normal
+    float4 posL : POSITION; //local position
+    float3 normalL : NORMAL; //local normal
 };
 
 struct v2pConnector
@@ -19,7 +19,7 @@ cbuffer PerApplication : register(b0)
 
 cbuffer PerFrame : register(b1)
 {
-    matrix g_view;
+    float4x4 g_view;
     float4x4 g_viewProj;
     float4 g_sunLightDirection;
     float3 g_worldEyePosition;
@@ -37,16 +37,19 @@ v2pConnector main(a2vConnector a2v)
 {
     v2pConnector v2p;
 
-    matrix worldViewProj = mul(projectionMatrix, mul(g_view, worldMatrix));
+    //float4x4 worldViewProj = mul(projectionMatrix, mul(g_view, worldMatrix));
+    //float4x4 viewProj = mul(projectionMatrix, g_view);
     //matrix worldInvTranspose = transpose(invert(worldMatrix));
     
+    //transform to world space
+    v2p.posW = mul(worldMatrix, float4(a2v.posL.xyz, 1.f)).xyz;
+
+    v2p.normalW = normalize(mul(worldMatrix, float4(a2v.normalL.xyz, 1.f)).xyz);
+    //v2p.normalW = a2v.normalL;
 
     //transform to homogeneous clip space
-    v2p.posH = mul(worldViewProj, float4(a2v.wsPosition.xyz, 1.f));
-
-    //transform to world space
-    v2p.posW = mul(worldMatrix, float4(a2v.wsPosition.xyz, 1.f)).xyz;
-    v2p.normalW = a2v.wsNormal;
+    //v2p.posH = mul(worldViewProj, float4(a2v.wsPosition.xyz, 1.f));
+    v2p.posH = mul(g_viewProj, float4(v2p.posW.xyz, 1.f));
     
     v2p.color = float4(1.f, 0.f, 0.f, 1.0f);
 
