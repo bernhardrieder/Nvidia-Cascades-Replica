@@ -50,13 +50,19 @@ private:
 		XMFLOAT3 Normal;
 	};
 
-	struct FrameConstantBuffer
+	struct CbPerFrame
 	{
-		XMMATRIX ViewMatrix;
+		XMMATRIX View;
+		XMMATRIX ViewProj;
 		XMVECTOR SunLightDirection;
+		XMFLOAT3 WorldEyePosition;
+		float AppTime;
+		XMFLOAT3 ScreenSize;
+		float DeltaTime;
+
 	};
 
-	FrameConstantBuffer m_cbPerFrame;
+	CbPerFrame m_cbPerFrame;
 	float m_sunTheta = -1.4f* DirectX::XM_PI;
 	float m_sunPhi = DirectX::XM_PIDIV2;
 
@@ -66,6 +72,15 @@ private:
 	// Shader data
 	ID3D11VertexShader* m_simpleVS = nullptr;
 	ID3D11PixelShader* m_simplePS = nullptr;
+
+#if _DEBUG
+	const wchar_t* m_compiledVSPath = L"Shader/drawRockVS_d.cso";
+	const wchar_t* m_compiledPSPath = L"Shader/drawRockPS_d.cso";
+#else
+	const wchar_t* m_compiledVSPath = L"Shader/drawRockVS.cso";
+	const wchar_t* m_compiledPSPath = L"Shader/drawRockPS.cso";
+#endif
+
 	ID3D11Buffer* m_constantBuffers[NumConstantBuffers];
 	std::unique_ptr<DirectX::CommonStates> m_commonStates;
 

@@ -39,7 +39,23 @@ namespace ShaderHelper
 		return true;
 	}
 
-	inline bool LoadGeometryShader(ID3D11Device* device, const wchar_t* compiledFilename, D3D11_SO_DECLARATION_ENTRY* soDecl, const size_t& soDeclCount, ID3D11GeometryShader* outGeometryShader)
+	inline bool LoadGeometryShader(ID3D11Device* device, const wchar_t* compiledFilename, ID3D11GeometryShader* outGeometryShader)
+	{
+		ID3DBlob* blob;
+
+		HRESULT hr = D3DReadFileToBlob(compiledFilename, &blob);
+		if (FAILED(hr))
+			return false;
+
+		hr = device->CreateGeometryShader(blob->GetBufferPointer(), blob->GetBufferSize(), NULL, &outGeometryShader);
+		if (FAILED(hr))
+			return false;
+
+		SafeRelease(blob);
+		return true;
+	}
+
+	inline bool LoadGeometryShaderWithStreamOutput(ID3D11Device* device, const wchar_t* compiledFilename, D3D11_SO_DECLARATION_ENTRY* soDecl, const size_t& soDeclCount, ID3D11GeometryShader* outGeometryShader)
 	{
 		ID3DBlob* blob;
 

@@ -51,6 +51,9 @@
     <ClInclude Include="MathHelper.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ShaderHelper.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -84,12 +87,6 @@
     </Image>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="Shader\SimplePixelShader.hlsl">
-      <Filter>Shader</Filter>
-    </FxCompile>
-    <FxCompile Include="Shader\SimpleVertexShader.hlsl">
-      <Filter>Shader</Filter>
-    </FxCompile>
     <FxCompile Include="Shader\create_density_tex3d_GS.hlsl">
       <Filter>Shader</Filter>
     </FxCompile>
@@ -103,6 +100,12 @@
       <Filter>Shader</Filter>
     </FxCompile>
     <FxCompile Include="Shader\generate_rock_VB_VS.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Shader\drawRockVS.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Shader\drawRockPS.hlsl">
       <Filter>Shader</Filter>
     </FxCompile>
   </ItemGroup>

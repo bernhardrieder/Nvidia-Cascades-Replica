@@ -8,6 +8,7 @@ using namespace DirectX::SimpleMath;
 
 ShaderLab::ShaderLab(HINSTANCE hInstance, int nCmdShow) : D3D11App(hInstance, nCmdShow), m_rockSize(30, 100, 30)
 {
+	m_cbPerFrame.AppTime = 0;
 }
 
 ShaderLab::~ShaderLab()
@@ -54,10 +55,15 @@ void ShaderLab::update(float deltaTime)
 {
 	checkAndProcessKeyboardInput(deltaTime);
 
-	auto viewMatrix = m_camera.GetView();
-	m_cbPerFrame.ViewMatrix = viewMatrix;
+
+	m_cbPerFrame.View = m_camera.GetView();
+	m_cbPerFrame.ViewProj = m_camera.GetView() * m_camera.GetProj();
+	m_cbPerFrame.ScreenSize = { (float)m_windowWidth, (float)m_windowHeight, 0.f};
+	m_cbPerFrame.WorldEyePosition = static_cast<XMFLOAT3>(m_camera.GetPosition());
 	m_cbPerFrame.SunLightDirection = -MathHelper::SphericalToCartesian(1.0f, m_sunTheta, m_sunPhi);
-	
+	m_cbPerFrame.AppTime += deltaTime;
+	m_cbPerFrame.DeltaTime = deltaTime;
+
 	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Frame], 0, nullptr, &m_cbPerFrame, 0, 0);
 	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Object], 0, nullptr, &m_worldMatrix, 0, 0);
 }
@@ -89,8 +95,6 @@ void ShaderLab::render(float deltaTime)
 
 	m_deviceContext->GSSetShader(nullptr, nullptr, 0);
 
-	auto wireframe = m_commonStates->Wireframe();
-	//m_deviceContext->RSSetState(wireframe);
 	m_deviceContext->RSSetState(m_rasterizerState);
 	m_deviceContext->RSSetViewports(1, &m_viewport);
 
@@ -101,10 +105,6 @@ void ShaderLab::render(float deltaTime)
 	m_deviceContext->OMSetDepthStencilState(m_depthStencilState, 1);
 
 	m_deviceContext->DrawAuto();
-
-
-	//m_deviceContext->GSSetShader(m_simpleGS, nullptr, 0);
-	//m_deviceContext->DrawAuto();
 
 	//Present Frame!!
 	m_swapChain->Present(0, 0);
@@ -117,7 +117,7 @@ bool ShaderLab::loadShaders()
 	ZeroMemory(&constantBufferDesc, sizeof(D3D11_BUFFER_DESC));
 
 	constantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-	constantBufferDesc.ByteWidth = sizeof(FrameConstantBuffer);
+	constantBufferDesc.ByteWidth = sizeof(CbPerFrame);
 	constantBufferDesc.CPUAccessFlags = 0;
 	constantBufferDesc.Usage = D3D11_USAGE_DEFAULT;
 
@@ -133,13 +133,8 @@ bool ShaderLab::loadShaders()
 
 	// Load the compiled vertex shader.
 	ID3DBlob* vertexShaderBlob;
-#if _DEBUG
-	LPCWSTR compiledVertexShaderObject = L"Shader/SimpleVertexShader_d.cso";
-#else
-	LPCWSTR compiledVertexShaderObject = L"Shader/SimpleVertexShader.cso";
-#endif
 
-	hr = D3DReadFileToBlob(compiledVertexShaderObject, &vertexShaderBlob);
+	hr = D3DReadFileToBlob(m_compiledVSPath, &vertexShaderBlob);
 	if (FAILED(hr))
 		return false;
 
@@ -162,13 +157,8 @@ bool ShaderLab::loadShaders()
 
 	// Load the compiled pixel shader.
 	ID3DBlob* pixelShaderBlob;
-#if _DEBUG
-	LPCWSTR compiledPixelShaderObject = L"Shader/SimplePixelShader_d.cso";
-#else
-	LPCWSTR compiledPixelShaderObject = L"Shader/SimplePixelShader.cso";
-#endif
 
-	hr = D3DReadFileToBlob(compiledPixelShaderObject, &pixelShaderBlob);
+	hr = D3DReadFileToBlob(m_compiledPSPath, &pixelShaderBlob);
 	if (FAILED(hr))
 		return false;
 
@@ -177,6 +167,7 @@ bool ShaderLab::loadShaders()
 		return false;
 
 	SafeRelease(pixelShaderBlob);
+
 	return true;
 }
 
