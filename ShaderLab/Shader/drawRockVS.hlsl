@@ -16,7 +16,10 @@ struct v2pConnector
 
 cbuffer PerApplication : register(b0)
 {
-    matrix projectionMatrix;
+    float4x4 g_projection;
+    float g_discplacementDepth = 0.08f;
+    float g_initialStepIterations = 10;
+    float g_refinementStepIterations = 5;
 }
 
 cbuffer PerFrame : register(b1)

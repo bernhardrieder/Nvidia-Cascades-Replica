@@ -8,7 +8,11 @@ using namespace DirectX::SimpleMath;
 
 ShaderLab::ShaderLab(HINSTANCE hInstance, int nCmdShow) : D3D11App(hInstance, nCmdShow), m_rockSize(30, 100, 30)
 {
-	m_cbPerFrame.AppTime = 0;
+	m_cbPerFrame.AppTime = 0;	
+	
+	m_cbPerApplication.DisplacementDepth = 0.08f;
+	m_cbPerApplication.InitialStepIterations = 10;
+	m_cbPerApplication.RefinementStepIterations = 5;
 }
 
 ShaderLab::~ShaderLab()
@@ -76,6 +80,12 @@ void ShaderLab::update(float deltaTime)
 	m_cbPerObject.World = m_worldMatrix;
 	m_cbPerObject.WorldInverseTranspose = (m_worldMatrix.Invert()).Transpose();
 	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Object], 0, nullptr, &m_cbPerObject, 0, 0);
+
+	if(m_updateCbPerApplication)
+	{
+		m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Application], 0, nullptr, &m_cbPerApplication, 0, 0);
+		m_updateCbPerApplication = false;
+	}
 }
 
 void ShaderLab::render(float deltaTime)
@@ -109,12 +119,18 @@ void ShaderLab::render(float deltaTime)
 	m_deviceContext->RSSetViewports(1, &m_viewport);
 
 	m_deviceContext->PSSetShader(m_simplePS, nullptr, 0);
-	m_deviceContext->PSSetConstantBuffers(0, 1, &m_constantBuffers[CB_Frame]);
+	m_deviceContext->PSSetConstantBuffers(0, 2, m_constantBuffers);
 	auto sampler = m_commonStates->PointWrap();
 	m_deviceContext->PSSetSamplers(0, 1, &m_lichenSampler);
 	m_deviceContext->PSSetShaderResources(0, 1, &m_texturesSRVs[0]);
 	m_deviceContext->PSSetShaderResources(1, 1, &m_texturesSRVs[3]);
 	m_deviceContext->PSSetShaderResources(2, 1, &m_texturesSRVs[18]);
+	m_deviceContext->PSSetShaderResources(3, 1, &m_texturesDispSRVs[0]);
+	m_deviceContext->PSSetShaderResources(4, 1, &m_texturesDispSRVs[3]);
+	m_deviceContext->PSSetShaderResources(5, 1, &m_texturesDispSRVs[18]);
+	m_deviceContext->PSSetShaderResources(6, 1, &m_texturesBumpSRVs[0]);
+	m_deviceContext->PSSetShaderResources(7, 1, &m_texturesBumpSRVs[3]);
+	m_deviceContext->PSSetShaderResources(8, 1, &m_texturesBumpSRVs[18]);
 
 
 	m_deviceContext->OMSetRenderTargets(1, &m_renderTargetView, m_depthStencilView);
@@ -136,7 +152,7 @@ bool ShaderLab::loadShaders()
 	constantBufferDesc.CPUAccessFlags = 0;
 	constantBufferDesc.Usage = D3D11_USAGE_DEFAULT;
 
-	constantBufferDesc.ByteWidth = sizeof(XMMATRIX);
+	constantBufferDesc.ByteWidth = sizeof(CbPerApplication);
 	HRESULT hr = m_device->CreateBuffer(&constantBufferDesc, nullptr, &m_constantBuffers[CB_Application]);
 	if (FAILED(hr))
 		return false;
@@ -207,8 +223,8 @@ void ShaderLab::onResize()
 	D3D11App::onResize();
 	// The window resized, so update the aspect ratio and recompute the projection matrix.
 	m_camera.SetLens(.5f * XM_PI, AspectRatio(), .1f, 10000.0f);
-	auto proj = m_camera.GetProj();
-	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Application], 0, nullptr, &proj, 0, 0);
+	m_cbPerApplication.Proj = m_camera.GetProj();
+	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Application], 0, nullptr, &m_cbPerApplication, 0, 0);
 }
 
 void ShaderLab::onMouseDown(WPARAM btnState, int x, int y)
@@ -274,6 +290,26 @@ void ShaderLab::checkAndProcessKeyboardInput(float deltaTime)
 		m_sunPhi -= 1.0f*deltaTime;
 
 	m_sunPhi = MathHelper::Clamp(m_sunPhi, 0.1f, XM_PIDIV2);
+
+
+	if (GetAsyncKeyState('O') & 0x8000)
+		m_cbPerApplication.DisplacementDepth -= 0.01f * deltaTime;
+	if (GetAsyncKeyState('P') & 0x8000)
+		m_cbPerApplication.DisplacementDepth += 0.01f * deltaTime;
+	if (GetAsyncKeyState('K') & 0x8000)
+		m_cbPerApplication.InitialStepIterations -= 1;
+	if (GetAsyncKeyState('L') & 0x8000)
+		m_cbPerApplication.InitialStepIterations += 1;
+	if (GetAsyncKeyState('N') & 0x8000)
+		m_cbPerApplication.RefinementStepIterations -= 1;
+	if (GetAsyncKeyState('M') & 0x8000)
+		m_cbPerApplication.RefinementStepIterations += 1;
+
+	if (GetAsyncKeyState('O') & 0x8000 || GetAsyncKeyState('P') & 0x8000 ||
+		GetAsyncKeyState('K') & 0x8000 || GetAsyncKeyState('L') & 0x8000 ||
+		GetAsyncKeyState('N') & 0x8000 || GetAsyncKeyState('M') & 0x8000)
+		m_updateCbPerApplication = true;
+
 }
 
 bool ShaderLab::initDirectX()
@@ -292,13 +328,20 @@ void ShaderLab::cleanup()
 bool ShaderLab::createTextures(ID3D11Device* device)
 {
 	m_texturesSRVs.resize(m_textureCount);
+	m_texturesDispSRVs.resize(m_textureCount);
+	m_texturesBumpSRVs.resize(m_textureCount);
 	for (int i = 1; i < m_textureCount + 1; ++i)
 	{
 		// Load the texture in.
 		auto filename = (m_textureFilesPath + m_textureGenericFilename + std::to_wstring(i) + m_textureFilenameExtension);
-		HRESULT hr = CreateDDSTextureFromFile(device, filename.c_str(), nullptr, &m_texturesSRVs[i - 1]);
+		auto filenameDisp = (m_textureDispFilesPath + m_textureGenericFilename + std::to_wstring(i) + L"_disp" + m_textureFilenameExtension);
+		auto filenameBump = (m_textureBumpFilesPath + m_textureGenericFilename + std::to_wstring(i) + L"_bump" + m_textureFilenameExtension);
 
-		if (FAILED(hr))
+		HRESULT hr = CreateDDSTextureFromFile(device, filename.c_str(), nullptr, &m_texturesSRVs[i - 1]);
+		HRESULT hrDisp = CreateDDSTextureFromFile(device, filenameDisp.c_str(), nullptr, &m_texturesDispSRVs[i - 1]);
+		HRESULT hrBump = CreateDDSTextureFromFile(device, filenameBump.c_str(), nullptr, &m_texturesBumpSRVs[i - 1]);
+
+		if (FAILED(hr) || FAILED(hrDisp) || FAILED(hrBump))
 			return false;
 	}
 
@@ -308,6 +351,14 @@ bool ShaderLab::createTextures(ID3D11Device* device)
 void ShaderLab::releaseTextures()
 {
 	for (auto a : m_texturesSRVs)
+	{
+		SafeRelease(a);
+	}
+	for (auto a : m_texturesDispSRVs)
+	{
+		SafeRelease(a);
+	}
+	for (auto a : m_texturesBumpSRVs)
 	{
 		SafeRelease(a);
 	}

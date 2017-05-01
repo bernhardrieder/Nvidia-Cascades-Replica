@@ -53,6 +53,14 @@ private:
 		XMFLOAT3 SurfaceNormal;
 	};
 
+	struct CbPerApplication
+	{
+		XMMATRIX Proj;
+		float DisplacementDepth;
+		float InitialStepIterations;
+		float RefinementStepIterations;
+	};
+
 	struct CbPerFrame
 	{
 		XMMATRIX View;
@@ -71,6 +79,8 @@ private:
 		XMMATRIX WorldInverseTranspose;
 	};
 
+	CbPerApplication m_cbPerApplication;
+	bool m_updateCbPerApplication = false;
 	CbPerFrame m_cbPerFrame;
 	CbPerObject m_cbPerObject;
 	float m_sunTheta = -1.4f* DirectX::XM_PI;
@@ -109,7 +119,11 @@ private:
 	ID3D11SamplerState* m_lichenSampler = nullptr;
 	const size_t m_textureCount = 19;
 	std::vector<ID3D11ShaderResourceView*> m_texturesSRVs;
+	std::vector<ID3D11ShaderResourceView*> m_texturesDispSRVs;
+	std::vector<ID3D11ShaderResourceView*> m_texturesBumpSRVs;
 	std::wstring m_textureFilesPath = L"Assets/Textures/";
+	std::wstring m_textureDispFilesPath = L"Assets/Textures/disp/";
+	std::wstring m_textureBumpFilesPath = L"Assets/Textures/bump/";
 	std::wstring m_textureGenericFilename = L"lichen";
 	std::wstring m_textureFilenameExtension = L".dds";
 };
