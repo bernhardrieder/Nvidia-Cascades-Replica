@@ -12,8 +12,9 @@ public:
 
 	struct GeometryShaderOutput
 	{
-		DirectX::XMFLOAT4 WorldSpacePosition;
-		DirectX::XMFLOAT3 WorldSpaceNormal;
+		DirectX::XMFLOAT4 LocalPosition;
+		DirectX::XMFLOAT3 LocalVertexNormal;
+		DirectX::XMFLOAT3 LocalSurfaceNormal;
 	};
 private:
 	struct VertexShaderInput

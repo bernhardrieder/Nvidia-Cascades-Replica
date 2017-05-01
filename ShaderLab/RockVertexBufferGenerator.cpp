@@ -112,6 +112,7 @@ bool RockVertexBufferGenerator::loadShaders(ID3D11Device* device)
 		// stream num, semantic name, semantic index, start component, component count, output slot
 		{ 0, "SV_POSITION", 0, 0, 4, 0 },   
 		{ 0, "NORMAL", 0, 0, 3, 0 },
+		{ 0, "NORMAL", 1, 0, 3, 0 },
 	};
 
 	HR_GS = device->CreateGeometryShaderWithStreamOutput(gsBlob->GetBufferPointer(), gsBlob->GetBufferSize(), pDecl, _countof(pDecl), NULL, 0, D3D11_SO_NO_RASTERIZED_STREAM, NULL, &m_geometryShader);

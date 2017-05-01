@@ -1,7 +1,8 @@
 struct a2vConnector
 {
     float4 posL : POSITION; //local position
-    float3 normalL : NORMAL; //local normal
+    float3 normalL : NORMAL0; //local vertex normal
+    float3 SurfaceNormalL : NORMAL1; //local surface normal
 };
 
 struct v2pConnector
@@ -9,7 +10,8 @@ struct v2pConnector
     float4 posH : SV_Position; //homogeneous clipspace
     float3 posW : POSITION; //worldspace coord
     float4 color : COLOR;
-    float3 normalW : NORMAL;
+    float3 normalW : NORMAL0;
+    float3 SurfaceNormalW : NORMAL1; //local surface normal
 };
 
 cbuffer PerApplication : register(b0)
@@ -48,8 +50,9 @@ v2pConnector main(a2vConnector a2v)
     v2p.normalW = mul(g_worldInvTranspose, float4(a2v.normalL.xyz, 1.f)).xyz;
     v2p.normalW = normalize(v2p.normalW);
     //v2p.normalW = a2v.normalL;
-    //v2p.surfaceNormal = mul(g_worldInvTranspose, float4(a2v.surfaceNormal.xyz, 1.f)).xyz;
-    //v2p.surfaceNormal = normalize(v2p.surfaceNormal);
+
+    v2p.SurfaceNormalW = mul(g_worldInvTranspose, float4(a2v.SurfaceNormalL.xyz, 1.f)).xyz;
+    v2p.SurfaceNormalW = normalize(v2p.SurfaceNormalW);
 
     //transform to homogeneous clip space
     //v2p.posH = mul(worldViewProj, float4(a2v.wsPosition.xyz, 1.f));

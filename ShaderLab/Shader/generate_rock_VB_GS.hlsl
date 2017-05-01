@@ -11,8 +11,8 @@ struct g2vbConnector
 { 
     // Stream out to a VB & save for reuse!
     float4 wsPosition : SV_POSITION;
-    float3 vertexNormal : NORMAL;
-    float3 surfaceNormal : SURFACENORMAL;
+    float3 vertexNormal : NORMAL0;
+    float3 surfaceNormal : NORMAL1;
 };
 
 cbuffer cbPerApp1 : register(b0)
@@ -98,25 +98,22 @@ void main(point v2gConnector input[1], inout TriangleStream<g2vbConnector> outSt
             int4 triData = cb_triTable[table_pos++];
             
             int vertexIndex = 0;
-            // calculate worldspace Position
             for (vertexIndex = 0; vertexIndex < 3; ++vertexIndex)
             {
+                //calculate local position
                 output[vertexIndex].wsPosition = float4(edgeVertexList[triData[vertexIndex]], 0.1f).xzyw;
                 output[vertexIndex].wsPosition.y *= (2.0f * (input[0].densityTexSize.y / input[0].densityTexSize.x)); // WorldSpaceVolumeHeight -> scale to real position with height == 1
                 
+                //calculate local normal
                 output[vertexIndex].vertexNormal = ComputeNormal(edgeVertexList[triData[vertexIndex]]).xzy;
-
-                //outStream.Append(output[vertexIndex]);
-
+                output[vertexIndex].vertexNormal = normalize(output[vertexIndex].vertexNormal);
             }
 
-            //calculate normal 
+            //calculate local surface normal 
             for (vertexIndex = 0; vertexIndex < 3; ++vertexIndex)
             {
                 //output[vertexIndex].surfaceNormal = calculateNormal(edgeVertexList[triData.x], edgeVertexList[triData.y], edgeVertexList[triData.z]);
                 output[vertexIndex].surfaceNormal = calculateNormal(output[0].wsPosition.xyz, output[1].wsPosition.xyz, output[2].wsPosition.xyz);
-                output[vertexIndex].vertexNormal = output[vertexIndex].surfaceNormal;
-
                 outStream.Append(output[vertexIndex]);
             }
             

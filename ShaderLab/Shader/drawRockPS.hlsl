@@ -3,7 +3,8 @@ struct v2pConnector
     float4 posH : SV_Position; //homogeneous clipspace
     float3 posW : POSITION; //worldspace coord
     float4 color : COLOR;
-    float3 normalW : NORMAL;
+    float3 normalW : NORMAL0;
+    float3 SurfaceNormalW : NORMAL1; //local surface normal
 };
 
 cbuffer PerFrame : register(b0)
@@ -25,14 +26,22 @@ SamplerState LinearRepeatAnsio : register(s0);
 
 #define MASTER_TEX_SCALE 1.45
 #define texture_scale 0.2
+#define FLAT_SHADING 1
 
 #include "inoise.hlsli"
 
 float4 main(v2pConnector v2p) : SV_Target
 {
+    float3 normal; 
+#if FLAT_SHADING == 1
+    normal = v2p.SurfaceNormalW;
+#else //smooth shading
+    normal = v2p.normalW;
+    //normal.y = (v2p.normalW.y + v2p.SurfaceNormalW.y) / 2.f;
+#endif
     // BLEND WEIGHTS FOR TRI-PLANAR PROJECTION
     //----------------------------------------------------------
-    float3 blend_weights = abs(normalize(v2p.normalW)) - 0.2f;
+    float3 blend_weights = abs(normalize(normal)) - 0.2f;
     blend_weights *= 7;
     blend_weights = pow(blend_weights, 3);
     blend_weights = max(0, blend_weights);
