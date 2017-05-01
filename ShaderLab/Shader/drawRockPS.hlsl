@@ -32,11 +32,11 @@ float4 main(v2pConnector v2p) : SV_Target
 {
     // BLEND WEIGHTS FOR TRI-PLANAR PROJECTION
     //----------------------------------------------------------
-    float3 blend_weights = abs(v2p.normalW) - 0.2f;
+    float3 blend_weights = abs(normalize(v2p.normalW)) - 0.2f;
     blend_weights *= 7;
     blend_weights = pow(blend_weights, 3);
     blend_weights = max(0, blend_weights);
-    blend_weights /= dot(blend_weights, 1);
+    blend_weights /= dot(blend_weights, float3(1.f, 1.f, 1.f));
     //blend_weights /= (blend_weights.x + blend_weights.y + blend_weights.z).xxx;
     
     //----------------------- TRI-PLANAR PROJECTION ---------------------------
@@ -46,16 +46,19 @@ float4 main(v2pConnector v2p) : SV_Target
     //float2 coord2 = v2p.posW.zx * 1.5 * PlanarTexScales.y * texture_scale * MASTER_TEX_SCALE;
     //float2 coord3 = v2p.posW.xy * 1.5 * PlanarTexScales.z * texture_scale * MASTER_TEX_SCALE;
     float2 coord1 = v2p.posW.yz * texture_scale;
-    float2 coord2 = v2p.posW.zx * texture_scale;
-    float2 coord3 = v2p.posW.xy * texture_scale;
+    float2 coord2 = v2p.posW.xz * texture_scale;
+    float2 coord3 = v2p.posW.xy  * texture_scale;
 
     float4 mossCol1 = lichen1.Sample(LinearRepeatAnsio, coord1); //.yxz;
     float4 mossCol2 = lichen2.Sample(LinearRepeatAnsio, coord2); //.yxz;
     float4 mossCol3 = lichen3.Sample(LinearRepeatAnsio, coord3); //.yxz;
+    //float4 mossCol1 = float4(0.f, 0.f, 0.f, 0.f);
+    //float4 mossCol2 = float4(0.f, 0.f, 0.f, 0.f);
+    //float4 mossCol3 = float4(0.f, 0.f, 0.f, 0.f);
 
     blendedColor =  mossCol1.xyzw * blend_weights.xxxx +
                     mossCol2.xyzw * blend_weights.yyyy +
-                    mossCol3.xyzw * blend_weights.zzzz;
+                    mossCol3.xyzw * blend_weights.zzzz ;
 
     //blendedColor =  mossCol1 * float4(blend_weights.xxx, 1.f) +
     //                mossCol2 * float4(blend_weights.yyy, 1.f) +

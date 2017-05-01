@@ -30,7 +30,8 @@ cbuffer PerFrame : register(b1)
 
 cbuffer PerObject : register(b2)
 {
-    matrix worldMatrix;
+    float4x4 g_world;
+    float4x4 g_worldInvTranspose;
 }
 
 v2pConnector main(a2vConnector a2v)
@@ -42,10 +43,13 @@ v2pConnector main(a2vConnector a2v)
     //matrix worldInvTranspose = transpose(invert(worldMatrix));
     
     //transform to world space
-    v2p.posW = mul(worldMatrix, float4(a2v.posL.xyz, 1.f)).xyz;
+    v2p.posW = mul(g_world, float4(a2v.posL.xyz, 1.f)).xyz;
 
-    v2p.normalW = normalize(mul(worldMatrix, float4(a2v.normalL.xyz, 1.f)).xyz);
+    v2p.normalW = mul(g_worldInvTranspose, float4(a2v.normalL.xyz, 1.f)).xyz;
+    v2p.normalW = normalize(v2p.normalW);
     //v2p.normalW = a2v.normalL;
+    //v2p.surfaceNormal = mul(g_worldInvTranspose, float4(a2v.surfaceNormal.xyz, 1.f)).xyz;
+    //v2p.surfaceNormal = normalize(v2p.surfaceNormal);
 
     //transform to homogeneous clip space
     //v2p.posH = mul(worldViewProj, float4(a2v.wsPosition.xyz, 1.f));

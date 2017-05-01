@@ -34,12 +34,12 @@ private:
 	bool createTextures(ID3D11Device* device);
 	void releaseTextures();
 	bool createSampler(ID3D11Device* device);
-	void releaseSample();
+	void releaseSampler();
 private:
 	// Shader resources
 	enum ShaderConstanBufferType
 	{
-		CB_Appliation,
+		CB_Application,
 		CB_Frame,
 		CB_Object,
 		NumConstantBuffers
@@ -50,6 +50,7 @@ private:
 	{
 		XMFLOAT4 Position;
 		XMFLOAT3 Normal;
+		XMFLOAT3 SurfaceNormal;
 	};
 
 	struct CbPerFrame
@@ -64,7 +65,14 @@ private:
 
 	};
 
+	struct CbPerObject
+	{
+		XMMATRIX World;
+		XMMATRIX WorldInverseTranspose;
+	};
+
 	CbPerFrame m_cbPerFrame;
+	CbPerObject m_cbPerObject;
 	float m_sunTheta = -1.4f* DirectX::XM_PI;
 	float m_sunPhi = DirectX::XM_PIDIV2;
 

@@ -16,6 +16,7 @@ ShaderLab::~ShaderLab()
 	ShaderLab::cleanup();
 	unloadShaders();
 	releaseTextures();
+	releaseSampler();
 }
 
 bool ShaderLab::Initialize()
@@ -52,7 +53,8 @@ bool ShaderLab::Initialize()
 	m_camera.UpdateViewMatrix();
 
 	m_worldMatrix = Matrix::CreateWorld(Vector3(0, 0, 0), Vector3::Forward, Vector3::Up);
-	m_worldMatrix *= Matrix::CreateScale(15, 10, 15);
+	m_worldMatrix *= Matrix::CreateScale(10, 10, 10);
+
 	return true;
 }
 
@@ -70,7 +72,10 @@ void ShaderLab::update(float deltaTime)
 	m_cbPerFrame.DeltaTime = deltaTime;
 
 	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Frame], 0, nullptr, &m_cbPerFrame, 0, 0);
-	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Object], 0, nullptr, &m_worldMatrix, 0, 0);
+
+	m_cbPerObject.World = m_worldMatrix;
+	m_cbPerObject.WorldInverseTranspose = (m_worldMatrix.Invert()).Transpose();
+	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Object], 0, nullptr, &m_cbPerObject, 0, 0);
 }
 
 void ShaderLab::render(float deltaTime)
@@ -128,16 +133,20 @@ bool ShaderLab::loadShaders()
 	ZeroMemory(&constantBufferDesc, sizeof(D3D11_BUFFER_DESC));
 
 	constantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-	constantBufferDesc.ByteWidth = sizeof(CbPerFrame);
 	constantBufferDesc.CPUAccessFlags = 0;
 	constantBufferDesc.Usage = D3D11_USAGE_DEFAULT;
 
-	HRESULT hr = m_device->CreateBuffer(&constantBufferDesc, nullptr, &m_constantBuffers[CB_Appliation]);
+	constantBufferDesc.ByteWidth = sizeof(XMMATRIX);
+	HRESULT hr = m_device->CreateBuffer(&constantBufferDesc, nullptr, &m_constantBuffers[CB_Application]);
 	if (FAILED(hr))
 		return false;
+
+	constantBufferDesc.ByteWidth = sizeof(CbPerFrame);
 	hr = m_device->CreateBuffer(&constantBufferDesc, nullptr, &m_constantBuffers[CB_Frame]);
 	if (FAILED(hr))
 		return false;
+
+	constantBufferDesc.ByteWidth = sizeof(CbPerObject);
 	hr = m_device->CreateBuffer(&constantBufferDesc, nullptr, &m_constantBuffers[CB_Object]);
 	if (FAILED(hr))
 		return false;
@@ -184,7 +193,7 @@ bool ShaderLab::loadShaders()
 
 void ShaderLab::unloadShaders()
 {
-	SafeRelease(m_constantBuffers[CB_Appliation]);
+	SafeRelease(m_constantBuffers[CB_Application]);
 	SafeRelease(m_constantBuffers[CB_Frame]);
 	SafeRelease(m_constantBuffers[CB_Object]);
 	SafeRelease(m_inputLayoutSimpleVS);
@@ -198,7 +207,7 @@ void ShaderLab::onResize()
 	// The window resized, so update the aspect ratio and recompute the projection matrix.
 	m_camera.SetLens(.5f * XM_PI, AspectRatio(), .1f, 10000.0f);
 	auto proj = m_camera.GetProj();
-	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Appliation], 0, nullptr, &proj, 0, 0);
+	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Application], 0, nullptr, &proj, 0, 0);
 }
 
 void ShaderLab::onMouseDown(WPARAM btnState, int x, int y)
@@ -313,9 +322,9 @@ bool ShaderLab::createSampler(ID3D11Device* device)
 	desc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
 
 	//from dxtk commonstates
-	//desc.MaxAnisotropy = 16;
-	//desc.MaxLOD = FLT_MAX;
-	//desc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+	desc.MaxAnisotropy = 16;
+	desc.MaxLOD = FLT_MAX;
+	desc.ComparisonFunc = D3D11_COMPARISON_NEVER;
 	
 
 	HRESULT hr = device->CreateSamplerState(&desc, &m_lichenSampler);
@@ -324,7 +333,7 @@ bool ShaderLab::createSampler(ID3D11Device* device)
 	return true;
 }
 
-void ShaderLab::releaseSample()
+void ShaderLab::releaseSampler()
 {
 	SafeRelease(m_lichenSampler);
 }

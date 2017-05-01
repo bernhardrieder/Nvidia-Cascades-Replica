@@ -11,14 +11,25 @@ struct g2vbConnector
 { 
     // Stream out to a VB & save for reuse!
     float4 wsPosition : SV_POSITION;
-    float3 wsNormal : NORMAL;
+    float3 vertexNormal : NORMAL;
+    float3 surfaceNormal : SURFACENORMAL;
 };
 
-cbuffer cbPerApp : register(b0)
+cbuffer cbPerApp1 : register(b0)
+{
+    //step from one corner to another
+    float4 cornerStep[8];
+    float4 dataStep;
+}
+
+cbuffer cbPerApp2 : register(b1)
 {
     int4 cb_caseToNumpolys[256];
     int4 cb_triTable[1280]; // 256*5 = 1280  (256 cases; up to 15 (0/3/6/9/12/15) verts output for each.)
 };
+
+Texture3D<float> densityTex : register(t0); // our volume of density values. (+=rock, -=air)
+SamplerState samplerTrilinearInterp : register(s0); // trilinearinterpolation; clamps on XY, wraps on Z.
 
 float3 vertexInterpolation(float3 v0, float3 v1, float l0, float l1)
 {
@@ -40,6 +51,18 @@ float3 calculateNormal(float3 p1, float3 p2, float3 p3)
 
     normal = normalize(normal);
     return normal;
+}
+
+float3 ComputeNormal(float3 pos)
+{
+    float3 gradient = float3(   densityTex.SampleLevel(samplerTrilinearInterp, (pos + float3(dataStep.x, 0, 0) + 1.0f) / 2.0f, 0.f) - 
+                                densityTex.SampleLevel(samplerTrilinearInterp, (pos + float3(-dataStep.x, 0, 0) + 1.0f) / 2.0f, 0.f),
+		                        densityTex.SampleLevel(samplerTrilinearInterp, (pos + float3(0, dataStep.y, 0) + 1.0f) / 2.0f, 0.f) - 
+                                densityTex.SampleLevel(samplerTrilinearInterp, (pos + float3(0, -dataStep.y, 0) + 1.0f) / 2.0f, 0.f),
+		                        densityTex.SampleLevel(samplerTrilinearInterp, (pos + float3(0, 0, dataStep.z) + 1.0f) / 2.0f, 0.f) - 
+                                densityTex.SampleLevel(samplerTrilinearInterp, (pos + float3(0, 0, -dataStep.z) + 1.0f) / 2.0f, 0.f));
+
+    return -normalize(gradient);
 }
 
 [maxvertexcount(15)]
@@ -80,13 +103,20 @@ void main(point v2gConnector input[1], inout TriangleStream<g2vbConnector> outSt
             {
                 output[vertexIndex].wsPosition = float4(edgeVertexList[triData[vertexIndex]], 0.1f).xzyw;
                 output[vertexIndex].wsPosition.y *= (2.0f * (input[0].densityTexSize.y / input[0].densityTexSize.x)); // WorldSpaceVolumeHeight -> scale to real position with height == 1
+                
+                output[vertexIndex].vertexNormal = ComputeNormal(edgeVertexList[triData[vertexIndex]]).xzy;
+
+                //outStream.Append(output[vertexIndex]);
+
             }
 
             //calculate normal 
             for (vertexIndex = 0; vertexIndex < 3; ++vertexIndex)
             {
-                //output[vertexIndex].wsNormal = calculateNormal(edgeVertexList[triData.x], edgeVertexList[triData.y], edgeVertexList[triData.z]);
-                output[vertexIndex].wsNormal = calculateNormal(output[0].wsPosition.xyz, output[1].wsPosition.xyz, output[2].wsPosition.xyz);
+                //output[vertexIndex].surfaceNormal = calculateNormal(edgeVertexList[triData.x], edgeVertexList[triData.y], edgeVertexList[triData.z]);
+                output[vertexIndex].surfaceNormal = calculateNormal(output[0].wsPosition.xyz, output[1].wsPosition.xyz, output[2].wsPosition.xyz);
+                output[vertexIndex].vertexNormal = output[vertexIndex].surfaceNormal;
+
                 outStream.Append(output[vertexIndex]);
             }
             
