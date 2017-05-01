@@ -21,6 +21,7 @@ cbuffer cbPerApp : register(b0)
 {
     //step from one corner to another
     float4 cornerStep[8];
+    float4 dataStep;
 }
 
 v2gConnector main(a2vConnector a2v)

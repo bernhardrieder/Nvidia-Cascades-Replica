@@ -12,8 +12,9 @@ public:
 
 	struct GeometryShaderOutput
 	{
-		DirectX::XMFLOAT4 WorldSpacePosition;
-		DirectX::XMFLOAT3 WorldSpaceNormal;
+		DirectX::XMFLOAT4 LocalPosition;
+		DirectX::XMFLOAT3 LocalVertexNormal;
+		DirectX::XMFLOAT3 LocalSurfaceNormal;
 	};
 private:
 	struct VertexShaderInput
@@ -35,12 +36,13 @@ private:
 	enum ShaderConstanBufferType
 	{
 		MarchingCubesLookUpTables = 0,
-		CornerStep,
+		Steps,
 		NumConstantBuffers
 	};
-	struct CB_CornerStep
+	struct CB_Steps
 	{
 		DirectX::XMFLOAT4 cornerStep[8];
+		DirectX::XMFLOAT4 dataStep;
 	};
 
 	struct CB_MC_LookUpTables
