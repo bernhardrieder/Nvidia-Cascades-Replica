@@ -32,9 +32,9 @@ Texture2D lichen3 : register(t2);
 Texture2D lichen1_disp : register(t3);
 Texture2D lichen2_disp : register(t4);
 Texture2D lichen3_disp : register(t5);
-Texture2D lichen1_bmp : register(t6);
-Texture2D lichen2_bmp : register(t7);
-Texture2D lichen3_bmp : register(t8);
+Texture2D lichen1_bump : register(t6);
+Texture2D lichen2_bump : register(t7);
+Texture2D lichen3_bump : register(t8);
 
 SamplerState LinearRepeatAnsio : register(s0);
 SamplerState LinearRepeat : register(s1);
@@ -44,7 +44,6 @@ SamplerState LinearRepeat : register(s1);
 
 float3 AddParallax(float2 coord, Texture2D bumpMap, float3 toEyeVec, float dispStrength)
 {
-    // PARALLAX
     float h = 1;
     float2 uv = coord;
     float prev_hits;
@@ -55,8 +54,8 @@ float3 AddParallax(float2 coord, Texture2D bumpMap, float3 toEyeVec, float dispS
 
     // first do some iterations to find the intersection.
     // this will just determine the displacement silhouette,
-    //   not the shading - we'll refine/interp this for smooth shading
-    //   between two of these iterations.
+    // not the shading - we'll refine/interp this for smooth shading
+    // between two of these iterations.
     prev_hits = 0;
     float hit_h = 0;
     for (int it = 0; it < g_initialStepIterations; it++)
@@ -123,12 +122,12 @@ float4 main(v2pConnector v2p) : SV_Target
     blend_weights *= 7;
     blend_weights = pow(blend_weights, 3);
     blend_weights = max(0, blend_weights);
-    blend_weights /= dot(blend_weights, float3(1.f, 1.f, 1.f));
+    blend_weights /= dot(blend_weights, float(1.f).xxx);
     
     //----------------------- TRI-PLANAR PROJECTION COORDINATES ---------------------------
-    float2 coord1 = v2p.posW.yz * TEXTURE_SCALE;
-    float2 coord2 = v2p.posW.xz * TEXTURE_SCALE;
-    float2 coord3 = v2p.posW.xy * TEXTURE_SCALE;
+    float2 xAxisCoord = v2p.posW.yz * TEXTURE_SCALE;
+    float2 yAxisCoord = v2p.posW.xz * TEXTURE_SCALE;
+    float2 zAxisCoord = v2p.posW.xy * TEXTURE_SCALE;
     
     //----------------------- PARALLAX MAPPING ---------------------------
     const float parallaxDistanceHighLOD = 2.5f; // dist @ which it's full-on 
@@ -142,41 +141,41 @@ float4 main(v2pConnector v2p) : SV_Target
         const float3 parallax_str = abs(pixelNormalW) * g_discplacementScale.xxx * g_parallaxDepth.xxx;
 
         if (parallax_str.x * blend_weights.x > 0)
-            coord1 = AddParallax(coord1, lichen1_disp, toEyeVecWithLOD.yzx, parallax_str.x).xy;
+            xAxisCoord = AddParallax(xAxisCoord, lichen1_disp, toEyeVecWithLOD.yzx, parallax_str.x).xy;
         if (parallax_str.y * blend_weights.y > 0)
-            coord2 = AddParallax(coord2, lichen2_disp, toEyeVecWithLOD.xzy, parallax_str.y).xy;
+            yAxisCoord = AddParallax(yAxisCoord, lichen2_disp, toEyeVecWithLOD.xzy, parallax_str.y).xy;
         if (parallax_str.z * blend_weights.z > 0)
-            coord3 = AddParallax(coord3, lichen3_disp, toEyeVecWithLOD.xyz, parallax_str.z).xy;
+            zAxisCoord = AddParallax(zAxisCoord, lichen3_disp, toEyeVecWithLOD.xyz, parallax_str.z).xy;
     }
     
     //----------------------- SAMPLE AND BLEND COLOR FROM TEXTURES ---------------------------
-    float4 mossCol1 = lichen1.Sample(LinearRepeatAnsio, coord1);
-    float4 mossCol2 = lichen2.Sample(LinearRepeatAnsio, coord2);
-    float4 mossCol3 = lichen3.Sample(LinearRepeatAnsio, coord3);
+    float4 xAxisColor = lichen1.Sample(LinearRepeatAnsio, xAxisCoord);
+    float4 yAxisColor = lichen2.Sample(LinearRepeatAnsio, yAxisCoord);
+    float4 zAxisColor = lichen3.Sample(LinearRepeatAnsio, zAxisCoord);
 
-    float4 blendedColor = mossCol1.xyzw * blend_weights.xxxx +
-                          mossCol2.xyzw * blend_weights.yyyy +
-                          mossCol3.xyzw * blend_weights.zzzz;
+    float4 blendedColor = xAxisColor * blend_weights.xxxx +
+                          yAxisColor * blend_weights.yyyy +
+                          zAxisColor * blend_weights.zzzz;
     
     //----------------------- SAMPLE AND BLEND NORMAL FROM BUMP MAP ---------------------------
-    float3 mossBmp[3];
-    mossBmp[0].yz = lichen1_bmp.Sample(LinearRepeatAnsio, coord1 * float2(1, 1)).xy - 0.5f;
-    mossBmp[0].x = 0;
-    mossBmp[1].xz = lichen2_bmp.Sample(LinearRepeatAnsio, coord2 * float2(1, 1)).xy - 0.5f;
-    mossBmp[1].y = 0;
-    mossBmp[2].xy = lichen3_bmp.Sample(LinearRepeatAnsio, coord3 * float2(1, 1)).xy - 0.5f;
-    mossBmp[2].z = 0;
+    float3 bumpMapNormal[3];
+    bumpMapNormal[0].yz = lichen1_bump.Sample(LinearRepeatAnsio, xAxisCoord * float2(1, 1)).xy - 0.5f;
+    bumpMapNormal[0].x = 0;
+    bumpMapNormal[1].xz = lichen2_bump.Sample(LinearRepeatAnsio, yAxisCoord * float2(1, 1)).xy - 0.5f;
+    bumpMapNormal[1].y = 0;
+    bumpMapNormal[2].xy = lichen3_bump.Sample(LinearRepeatAnsio, zAxisCoord * float2(1, 1)).xy - 0.5f;
+    bumpMapNormal[2].z = 0;
 
-    mossBmp[0].yz *= -1;
-    mossBmp[1].xz *= -1;
-    mossBmp[2].xy *= -1;
+    bumpMapNormal[0].yz *= -1.5f;
+    bumpMapNormal[1].xz *= -1.5f;
+    bumpMapNormal[2].xy *= -1.5f;
 
-    float3 mossBumpMapNormal = mossBmp[0] * blend_weights.xxx +
-                               mossBmp[1] * blend_weights.yyy +
-                               mossBmp[2] * blend_weights.zzz;
+    float3 blendedBumpMapNormal = bumpMapNormal[0] * blend_weights.xxx + // x-axis
+                                  bumpMapNormal[1] * blend_weights.yyy + // y-axis
+                                  bumpMapNormal[2] * blend_weights.zzz;  // z-axis
 
     //----------------------- SIMPLE LIGHTNING FUNCTION ---------------------------
-    float4 lightIntensity = dot(g_sunLightDirection.xyz, normalize(pixelNormalW + mossBumpMapNormal));
+    float4 lightIntensity = dot(g_sunLightDirection.xyz, normalize(pixelNormalW + blendedBumpMapNormal));
     float4 final_color = saturate(lightIntensity * blendedColor);
     float4 ambient = (0.1f * blendedColor);
     final_color = normalize((float4(final_color.xyz, 1) + ambient));
