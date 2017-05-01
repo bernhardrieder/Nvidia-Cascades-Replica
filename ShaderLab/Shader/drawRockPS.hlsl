@@ -122,6 +122,8 @@ float4 main(v2pConnector v2p) : SV_Target
     blend_weights *= 7;
     blend_weights = pow(blend_weights, 3);
     blend_weights = max(0, blend_weights);
+    //blend_weights.xyz /= float3(30.f, 100.f, 30.f);
+    blend_weights.y *= 0.005;
     blend_weights /= dot(blend_weights, float(1.f).xxx);
     
     //----------------------- TRI-PLANAR PROJECTION COORDINATES ---------------------------
