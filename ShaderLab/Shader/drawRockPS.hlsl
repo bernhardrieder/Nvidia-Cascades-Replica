@@ -130,42 +130,23 @@ float4 main(v2pConnector v2p) : SV_Target
     float2 coord2 = v2p.posW.xz * TEXTURE_SCALE;
     float2 coord3 = v2p.posW.xy * TEXTURE_SCALE;
     
-    //----------------------- PARALLAX ---------------------------
-    float parallaxOcclusion = 1;
-    const float parallax_depth1 = 0.40 * 4;
-    const float parallax_depth2 = 0.85 * 4;
-    float parallax_effect = saturate((parallax_depth2 - toEyeDistance) / (parallax_depth2 - parallax_depth1));
-    //float parallax_effect = 1;
+    //----------------------- PARALLAX MAPPING ---------------------------
+    const float parallaxDistanceHighLOD = 2.5f; // dist @ which it's full-on 
+    const float parallaxDistanceLowLOD = 5.0f ; // dist @ which it's first noticeable
+    float parallaxEffectLOD = saturate((parallaxDistanceLowLOD - toEyeDistance) / (parallaxDistanceLowLOD - parallaxDistanceHighLOD));
+    //parallaxEffectDetail = 1; //<----- define if you want parallax without LOD!
 
-    if (parallax_effect > 0)     // *very* important for good faraway framerate
+    if (parallaxEffectLOD > 0)
     {
-        float3 E2 = toEyeVec * parallax_effect;
-        //const float3 str_mults = saturate((abs(pixelNormalW) - 0.4) * 3);
-        //const float3 parallax_str = str_mults.xyz * g_discplacementScale.xxx * g_parallaxDepth.xxx; //25;//15;//11; // 550 = WHOA
-        const float3 parallax_str = g_discplacementScale.xxx * g_parallaxDepth.xxx; //25;//15;//11; // 550 = WHOA
-        float3 ret;
-        //float3 parallax_hit;
-        if (parallax_str.x * blend_weights.x > 0)
-        {
-            ret = AddParallax(coord1, lichen1_disp, E2.yzx, parallax_str.x);
-            coord1 = ret.xy;
-            //parallax_hit.x = ret.z;
-        }
-        if (parallax_str.y * blend_weights.y > 0)
-        {
-            ret = AddParallax(coord2, lichen2_disp, E2.xzy, parallax_str.y);
-            coord2 = ret.xy;
-            //parallax_hit.y = ret.z;
-        }
-        if (parallax_str.z * blend_weights.z > 0)
-        {
-            ret = AddParallax(coord3, lichen3_disp, E2.xyz, parallax_str.z);
-            coord3 = ret.xy;
-            //parallax_hit.z = ret.z;
-        }
+        float3 toEyeVecWithLOD = toEyeVec * parallaxEffectLOD;
+        const float3 parallax_str = abs(pixelNormalW) * g_discplacementScale.xxx * g_parallaxDepth.xxx;
 
-        //float blended_parallax_hit = dot(blend_weights, parallax_hit);
-        //parallaxOcclusion = lerp(1, 0.77 + 0.23 * saturate(blended_parallax_hit), parallax_effect);
+        if (parallax_str.x * blend_weights.x > 0)
+            coord1 = AddParallax(coord1, lichen1_disp, toEyeVecWithLOD.yzx, parallax_str.x).xy;
+        if (parallax_str.y * blend_weights.y > 0)
+            coord2 = AddParallax(coord2, lichen2_disp, toEyeVecWithLOD.xzy, parallax_str.y).xy;
+        if (parallax_str.z * blend_weights.z > 0)
+            coord3 = AddParallax(coord3, lichen3_disp, toEyeVecWithLOD.xyz, parallax_str.z).xy;
     }
     
     //----------------------- SAMPLE AND BLEND COLOR FROM TEXTURES ---------------------------
@@ -176,8 +157,6 @@ float4 main(v2pConnector v2p) : SV_Target
     float4 blendedColor = mossCol1.xyzw * blend_weights.xxxx +
                           mossCol2.xyzw * blend_weights.yyyy +
                           mossCol3.xyzw * blend_weights.zzzz;
-    blendedColor *= parallaxOcclusion.xxxx;
-
     
     //----------------------- SAMPLE AND BLEND NORMAL FROM BUMP MAP ---------------------------
     float3 mossBmp[3];
