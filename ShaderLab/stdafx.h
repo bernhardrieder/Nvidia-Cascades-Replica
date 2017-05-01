@@ -44,9 +44,12 @@ inline void SafeRelease(T& ptr)
 	}
 }
 
+#include <vector>
 #include <memory>
 #include <wchar.h>
 #include <exception>
+#include "MathHelper.h"
+#include "ShaderHelper.h"
 #include "D3D11App.h"
 #define _USE_MATH_DEFINES
 #include <cmath>

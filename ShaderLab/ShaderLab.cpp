@@ -6,14 +6,22 @@
 using namespace DirectX;
 using namespace DirectX::SimpleMath;
 
-ShaderLab::ShaderLab(HINSTANCE hInstance, int nCmdShow) : D3D11App(hInstance, nCmdShow), m_rockSize( 30, 50, 30 )
+ShaderLab::ShaderLab(HINSTANCE hInstance, int nCmdShow) : D3D11App(hInstance, nCmdShow), m_rockSize(30, 100, 30)
 {
+	m_cbPerFrame.AppTime = 0;	
+	
+	m_cbPerApplication.DisplacementScale = 2.f;
+	m_cbPerApplication.InitialStepIterations = 24;
+	m_cbPerApplication.RefinementStepIterations = 12;
+	m_cbPerApplication.ParallaxDepth = 15;
 }
 
 ShaderLab::~ShaderLab()
 {
 	ShaderLab::cleanup();
 	unloadShaders();
+	releaseTextures();
+	releaseSampler();
 }
 
 bool ShaderLab::Initialize()
@@ -31,25 +39,54 @@ bool ShaderLab::Initialize()
 	if (!m_rockVBGenerator.Initialize(m_device, m_rockSize))
 		return false;
 
+	if (!createTextures(m_device))
+	{
+		MessageBox(nullptr, TEXT("Failed to load textures. Is Assets/Textures folder in execution folder?"), TEXT("Error"), MB_OK);
+		return false;
+	}
+	if(!createSampler(m_device))
+	{
+		MessageBox(nullptr, TEXT("Failed create SamplerStates!"), TEXT("Error"), MB_OK);
+		return false;
+	}
+
 
 	m_commonStates = std::make_unique<CommonStates>(m_device);
-	m_camera.SetPosition(0., 0.0f,-20.f);
+	m_camera.SetPosition(0., 0.0f, -20.f);
 	onResize();
 	m_camera.LookAt(Vector3::Up, Vector3(0, 10, 0) - m_camera.GetPosition());
 	m_camera.UpdateViewMatrix();
 
 	m_worldMatrix = Matrix::CreateWorld(Vector3(0, 0, 0), Vector3::Forward, Vector3::Up);
-	m_worldMatrix *= Matrix::CreateScale(10,10,10);
+	m_worldMatrix *= Matrix::CreateScale(10, 10, 10);
+
 	return true;
 }
 
 void ShaderLab::update(float deltaTime)
 {
 	checkAndProcessKeyboardInput(deltaTime);
-	
-	auto viewMatrix = m_camera.GetView();
-	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Frame], 0, nullptr, &viewMatrix, 0, 0);
-	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Object], 0, nullptr, &m_worldMatrix, 0, 0);
+
+
+	m_cbPerFrame.View = m_camera.GetView();
+	m_cbPerFrame.ViewProj = m_camera.GetView() * m_camera.GetProj();
+	m_cbPerFrame.ScreenSize = { (float)m_windowWidth, (float)m_windowHeight, 0.f};
+	m_cbPerFrame.WorldEyePosition = static_cast<XMFLOAT3>(m_camera.GetPosition());
+	m_cbPerFrame.SunLightDirection = -MathHelper::SphericalToCartesian(1.0f, m_sunTheta, m_sunPhi);
+	m_cbPerFrame.AppTime += deltaTime;
+	m_cbPerFrame.DeltaTime = deltaTime;
+
+	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Frame], 0, nullptr, &m_cbPerFrame, 0, 0);
+
+	m_cbPerObject.World = m_worldMatrix;
+	m_cbPerObject.WorldInverseTranspose = (m_worldMatrix.Invert()).Transpose();
+	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Object], 0, nullptr, &m_cbPerObject, 0, 0);
+
+	if(m_updateCbPerApplication)
+	{
+		m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Application], 0, nullptr, &m_cbPerApplication, 0, 0);
+		m_updateCbPerApplication = false;
+	}
 }
 
 void ShaderLab::render(float deltaTime)
@@ -59,7 +96,7 @@ void ShaderLab::render(float deltaTime)
 
 	if (!m_isDensityTextureGenerated)
 		m_isDensityTextureGenerated = m_densityTexGenerator.Generate(m_deviceContext);
-	
+
 	if (m_isDensityTextureGenerated && !m_isRockVertexBufferGenerated)
 		m_isRockVertexBufferGenerated = m_rockVBGenerator.Generate(m_deviceContext, m_densityTexGenerator.GetTexture3DShaderResourceView());
 
@@ -79,16 +116,28 @@ void ShaderLab::render(float deltaTime)
 
 	m_deviceContext->GSSetShader(nullptr, nullptr, 0);
 
-	auto wireframe = m_commonStates->Wireframe();
-	m_deviceContext->RSSetState(wireframe);
-	//m_deviceContext->RSSetState(m_rasterizerState);
+	m_deviceContext->RSSetState(m_rasterizerState);
 	m_deviceContext->RSSetViewports(1, &m_viewport);
 
 	m_deviceContext->PSSetShader(m_simplePS, nullptr, 0);
+	m_deviceContext->PSSetConstantBuffers(0, 2, m_constantBuffers);
+	auto sampler = m_commonStates->LinearWrap();
+	m_deviceContext->PSSetSamplers(0, 1, &m_lichenSampler);
+	m_deviceContext->PSSetSamplers(1, 1, &sampler);
+	m_deviceContext->PSSetShaderResources(0, 1, &m_texturesSRVs[14]);
+	m_deviceContext->PSSetShaderResources(1, 1, &m_texturesSRVs[3]);
+	m_deviceContext->PSSetShaderResources(2, 1, &m_texturesSRVs[18]);
+	m_deviceContext->PSSetShaderResources(3, 1, &m_texturesDispSRVs[14]);
+	m_deviceContext->PSSetShaderResources(4, 1, &m_texturesDispSRVs[3]);
+	m_deviceContext->PSSetShaderResources(5, 1, &m_texturesDispSRVs[18]);
+	m_deviceContext->PSSetShaderResources(6, 1, &m_texturesBumpSRVs[14]);
+	m_deviceContext->PSSetShaderResources(7, 1, &m_texturesBumpSRVs[3]);
+	m_deviceContext->PSSetShaderResources(8, 1, &m_texturesBumpSRVs[18]);
+
 
 	m_deviceContext->OMSetRenderTargets(1, &m_renderTargetView, m_depthStencilView);
 	m_deviceContext->OMSetDepthStencilState(m_depthStencilState, 1);
-	
+
 	m_deviceContext->DrawAuto();
 
 	//Present Frame!!
@@ -102,29 +151,28 @@ bool ShaderLab::loadShaders()
 	ZeroMemory(&constantBufferDesc, sizeof(D3D11_BUFFER_DESC));
 
 	constantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-	constantBufferDesc.ByteWidth = sizeof(XMMATRIX);
 	constantBufferDesc.CPUAccessFlags = 0;
 	constantBufferDesc.Usage = D3D11_USAGE_DEFAULT;
 
-	HRESULT hr = m_device->CreateBuffer(&constantBufferDesc, nullptr, &m_constantBuffers[CB_Appliation]);
+	constantBufferDesc.ByteWidth = sizeof(CbPerApplication);
+	HRESULT hr = m_device->CreateBuffer(&constantBufferDesc, nullptr, &m_constantBuffers[CB_Application]);
 	if (FAILED(hr))
 		return false;
+
+	constantBufferDesc.ByteWidth = sizeof(CbPerFrame);
 	hr = m_device->CreateBuffer(&constantBufferDesc, nullptr, &m_constantBuffers[CB_Frame]);
 	if (FAILED(hr))
 		return false;
+
+	constantBufferDesc.ByteWidth = sizeof(CbPerObject);
 	hr = m_device->CreateBuffer(&constantBufferDesc, nullptr, &m_constantBuffers[CB_Object]);
 	if (FAILED(hr))
 		return false;
 
 	// Load the compiled vertex shader.
 	ID3DBlob* vertexShaderBlob;
-#if _DEBUG
-	LPCWSTR compiledVertexShaderObject = L"Shader/SimpleVertexShader_d.cso";
-#else
-	LPCWSTR compiledVertexShaderObject = L"Shader/SimpleVertexShader.cso";
-#endif
 
-	hr = D3DReadFileToBlob(compiledVertexShaderObject, &vertexShaderBlob);
+	hr = D3DReadFileToBlob(m_compiledVSPath, &vertexShaderBlob);
 	if (FAILED(hr))
 		return false;
 
@@ -136,7 +184,8 @@ bool ShaderLab::loadShaders()
 	D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
 	{
 		{"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(VertexPosNormal,Position), D3D11_INPUT_PER_VERTEX_DATA, 0},
-		{"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(VertexPosNormal,Normal), D3D11_INPUT_PER_VERTEX_DATA, 0}
+		{"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(VertexPosNormal,Normal), D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{ "NORMAL", 1, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(VertexPosNormal,SurfaceNormal), D3D11_INPUT_PER_VERTEX_DATA, 0 }
 	};
 
 	hr = m_device->CreateInputLayout(vertexLayoutDesc, _countof(vertexLayoutDesc), vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize(), &m_inputLayoutSimpleVS);
@@ -147,13 +196,8 @@ bool ShaderLab::loadShaders()
 
 	// Load the compiled pixel shader.
 	ID3DBlob* pixelShaderBlob;
-#if _DEBUG
-	LPCWSTR compiledPixelShaderObject = L"Shader/SimplePixelShader_d.cso";
-#else
-	LPCWSTR compiledPixelShaderObject = L"Shader/SimplePixelShader.cso";
-#endif
 
-	hr = D3DReadFileToBlob(compiledPixelShaderObject, &pixelShaderBlob);
+	hr = D3DReadFileToBlob(m_compiledPSPath, &pixelShaderBlob);
 	if (FAILED(hr))
 		return false;
 
@@ -162,28 +206,27 @@ bool ShaderLab::loadShaders()
 		return false;
 
 	SafeRelease(pixelShaderBlob);
+
 	return true;
 }
 
 void ShaderLab::unloadShaders()
 {
-	SafeRelease(m_constantBuffers[CB_Appliation]);
+	SafeRelease(m_constantBuffers[CB_Application]);
 	SafeRelease(m_constantBuffers[CB_Frame]);
 	SafeRelease(m_constantBuffers[CB_Object]);
 	SafeRelease(m_inputLayoutSimpleVS);
 	SafeRelease(m_simpleVS);
 	SafeRelease(m_simplePS);
-	SafeRelease(m_simpleGS);
 }
 
 void ShaderLab::onResize()
 {
-	static float pi = 3.1415926535f; // cmath include isn't working?!?!
 	D3D11App::onResize();
 	// The window resized, so update the aspect ratio and recompute the projection matrix.
-	m_camera.SetLens(.5f * pi, AspectRatio(), .1f, 10000.0f);
-	auto proj = m_camera.GetProj();
-	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Appliation], 0, nullptr, &proj, 0, 0);
+	m_camera.SetLens(.5f * XM_PI, AspectRatio(), .1f, 10000.0f);
+	m_cbPerApplication.Proj = m_camera.GetProj();
+	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Application], 0, nullptr, &m_cbPerApplication, 0, 0);
 }
 
 void ShaderLab::onMouseDown(WPARAM btnState, int x, int y)
@@ -235,36 +278,59 @@ void ShaderLab::checkAndProcessKeyboardInput(float deltaTime)
 
 	m_camera.UpdateViewMatrix();
 
-	//TODO: ADD rock control FEATURE! -> density & vb generator needs reinit!
-	//rock control
-	//bool buttoLeftPressed = GetAsyncKeyState(VK_LEFT) & 0x8000;
-	//bool buttonRightPressed = GetAsyncKeyState(VK_RIGHT) & 0x8000;
-	//bool buttonUpPressed = GetAsyncKeyState(VK_UP) & 0x8000;
-	//bool buttonDownPressed = GetAsyncKeyState(VK_DOWN) & 0x8000;
-	//if (buttoLeftPressed)
-	//{
-	//	m_rockSize.x -= 1;
-	//	m_rockSize.z -= 1;
-	//} 
-	//else if (buttonRightPressed)
-	//{
-	//	m_rockSize.x += 1;
-	//	m_rockSize.z += 1;
-	//}
+	//SUN ROTATION
+	if (GetAsyncKeyState(VK_LEFT) & 0x8000)
+		m_sunTheta -= 1.0f*deltaTime;
 
-	//if (buttonUpPressed)
-	//{
-	//	m_rockSize.y += 1;
-	//}
-	//else if (buttonDownPressed)
-	//{
-	//	m_rockSize.y -= 1;
-	//}
-	//if(buttoLeftPressed || buttonRightPressed || buttonUpPressed || buttonDownPressed)
-	//{
-	//	m_isDensityTextureGenerated = false;
-	//	m_isRockVertexBufferGenerated = false;
-	//}
+	if (GetAsyncKeyState(VK_RIGHT) & 0x8000)
+		m_sunTheta += 1.0f*deltaTime;
+
+	if (GetAsyncKeyState(VK_UP) & 0x8000)
+		m_sunPhi += 1.0f*deltaTime;
+
+	if (GetAsyncKeyState(VK_DOWN) & 0x8000)
+		m_sunPhi -= 1.0f*deltaTime;
+
+	m_sunPhi = MathHelper::Clamp(m_sunPhi, 0.1f, XM_PIDIV2);
+
+
+	//per app (mostly parallax elements) constant buffer
+	if (GetAsyncKeyState('O') & 0x8000)
+	{
+		m_cbPerApplication.DisplacementScale -= 0.1f * deltaTime;
+		if (m_cbPerApplication.DisplacementScale < 0.0f)
+			m_cbPerApplication.DisplacementScale = 0.f;
+	}
+	if (GetAsyncKeyState('P') & 0x8000)
+		m_cbPerApplication.DisplacementScale += 0.1f * deltaTime;
+	if (GetAsyncKeyState('K') & 0x8000)
+	{
+		if (m_cbPerApplication.InitialStepIterations >= 4)
+		{
+			m_cbPerApplication.InitialStepIterations -= 2;
+			m_cbPerApplication.RefinementStepIterations = m_cbPerApplication.InitialStepIterations / 2;
+		}
+	}
+	if (GetAsyncKeyState('L') & 0x8000)
+	{
+		m_cbPerApplication.InitialStepIterations += 2;
+		m_cbPerApplication.RefinementStepIterations = m_cbPerApplication.InitialStepIterations / 2;
+	}
+	if (GetAsyncKeyState('N') & 0x8000)
+	{
+		m_cbPerApplication.ParallaxDepth -= 1.f * deltaTime;
+		if (m_cbPerApplication.ParallaxDepth < 0.0f)
+			m_cbPerApplication.ParallaxDepth = 0.f;
+	}
+	if (GetAsyncKeyState('M') & 0x8000)
+		m_cbPerApplication.ParallaxDepth += 1.f * deltaTime;
+
+
+	if (GetAsyncKeyState('O') & 0x8000 || GetAsyncKeyState('P') & 0x8000 ||
+		GetAsyncKeyState('K') & 0x8000 || GetAsyncKeyState('L') & 0x8000 ||
+		GetAsyncKeyState('N') & 0x8000 || GetAsyncKeyState('M') & 0x8000)
+		m_updateCbPerApplication = true;
+
 }
 
 bool ShaderLab::initDirectX()
@@ -278,4 +344,69 @@ bool ShaderLab::initDirectX()
 void ShaderLab::cleanup()
 {
 	D3D11App::cleanup();
+}
+
+bool ShaderLab::createTextures(ID3D11Device* device)
+{
+	m_texturesSRVs.resize(m_textureCount);
+	m_texturesDispSRVs.resize(m_textureCount);
+	m_texturesBumpSRVs.resize(m_textureCount);
+	for (int i = 1; i < m_textureCount + 1; ++i)
+	{
+		// Load the texture in.
+		auto filename = (m_textureFilesPath + m_textureGenericFilename + std::to_wstring(i) + m_textureFilenameExtension);
+		auto filenameDisp = (m_textureDispFilesPath + m_textureGenericFilename + std::to_wstring(i) + L"_disp" + m_textureFilenameExtension);
+		auto filenameBump = (m_textureBumpFilesPath + m_textureGenericFilename + std::to_wstring(i) + L"_bump" + m_textureFilenameExtension);
+
+		HRESULT hr = CreateDDSTextureFromFile(device, filename.c_str(), nullptr, &m_texturesSRVs[i - 1]);
+		HRESULT hrDisp = CreateDDSTextureFromFile(device, filenameDisp.c_str(), nullptr, &m_texturesDispSRVs[i - 1]);
+		HRESULT hrBump = CreateDDSTextureFromFile(device, filenameBump.c_str(), nullptr, &m_texturesBumpSRVs[i - 1]);
+
+		if (FAILED(hr) || FAILED(hrDisp) || FAILED(hrBump))
+			return false;
+	}
+
+	return true;
+}
+
+void ShaderLab::releaseTextures()
+{
+	for (auto a : m_texturesSRVs)
+	{
+		SafeRelease(a);
+	}
+	for (auto a : m_texturesDispSRVs)
+	{
+		SafeRelease(a);
+	}
+	for (auto a : m_texturesBumpSRVs)
+	{
+		SafeRelease(a);
+	}
+}
+
+bool ShaderLab::createSampler(ID3D11Device* device)
+{
+	D3D11_SAMPLER_DESC desc;
+	ZeroMemory(&desc, sizeof(D3D11_SAMPLER_DESC));
+	desc.Filter = D3D11_FILTER_ANISOTROPIC;
+	desc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+	desc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+	desc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+
+	//from dxtk commonstates
+	desc.MaxAnisotropy = 16;
+	desc.MaxLOD = FLT_MAX;
+	desc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+	
+
+	HRESULT hr = device->CreateSamplerState(&desc, &m_lichenSampler);
+	if (FAILED(hr))
+		return false;
+	return true;
+}
+
+void ShaderLab::releaseSampler()
+{
+	SafeRelease(m_lichenSampler);
 }

@@ -143,8 +143,10 @@
     <ClInclude Include="D3D11App.h" />
     <ClInclude Include="Density3DTextureGenerator.h" />
     <ClInclude Include="LookUpTables.h" />
+    <ClInclude Include="MathHelper.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="RockVertexBufferGenerator.h" />
+    <ClInclude Include="ShaderHelper.h" />
     <ClInclude Include="ShaderLab.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
@@ -239,7 +241,7 @@
       <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(OutDir)Shader\%(Filename).cso</ObjectFileOutput>
       <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)Shader\%(Filename).cso</ObjectFileOutput>
     </FxCompile>
-    <FxCompile Include="Shader\SimplePixelShader.hlsl">
+    <FxCompile Include="Shader\drawRockPS.hlsl">
       <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">main</EntryPointName>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Pixel</ShaderType>
       <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">main</EntryPointName>
@@ -273,7 +275,7 @@
       <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(OutDir)Shader\%(Filename).cso</ObjectFileOutput>
       <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)Shader\%(Filename).cso</ObjectFileOutput>
     </FxCompile>
-    <FxCompile Include="Shader\SimpleVertexShader.hlsl">
+    <FxCompile Include="Shader\drawRockVS.hlsl">
       <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">main</EntryPointName>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Vertex</ShaderType>
       <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">main</EntryPointName>

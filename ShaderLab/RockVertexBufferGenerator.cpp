@@ -57,12 +57,15 @@ bool RockVertexBufferGenerator::Generate(ID3D11DeviceContext* deviceContext, ID3
 	deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
 
 	deviceContext->VSSetShader(m_vertexShader, nullptr, 0);
-	deviceContext->VSSetConstantBuffers(0, 1, &m_constantBuffers[CornerStep]);
+	deviceContext->VSSetConstantBuffers(0, 1, &m_constantBuffers[Steps]);
 	deviceContext->VSSetShaderResources(0, 1, &densityTexture3D);
 	deviceContext->VSSetSamplers(0, 1, &m_samplerState);
 
 	deviceContext->GSSetShader(m_geometryShader, nullptr, 0);
-	deviceContext->GSSetConstantBuffers(0, 1, m_constantBuffers);
+	deviceContext->GSSetConstantBuffers(0, 1, &m_constantBuffers[Steps]);
+	deviceContext->GSSetConstantBuffers(1, 1, &m_constantBuffers[MarchingCubesLookUpTables]);
+	deviceContext->GSSetShaderResources(0, 1, &densityTexture3D);
+	deviceContext->GSSetSamplers(0, 1, &m_samplerState);
 
 	deviceContext->RSSetState(nullptr);
 	deviceContext->RSSetViewports(0, nullptr);
@@ -108,7 +111,8 @@ bool RockVertexBufferGenerator::loadShaders(ID3D11Device* device)
 	{
 		// stream num, semantic name, semantic index, start component, component count, output slot
 		{ 0, "SV_POSITION", 0, 0, 4, 0 },   
-		{ 0, "NORMAL", 0, 0, 3, 0 }
+		{ 0, "NORMAL", 0, 0, 3, 0 },
+		{ 0, "NORMAL", 1, 0, 3, 0 },
 	};
 
 	HR_GS = device->CreateGeometryShaderWithStreamOutput(gsBlob->GetBufferPointer(), gsBlob->GetBufferSize(), pDecl, _countof(pDecl), NULL, 0, D3D11_SO_NO_RASTERIZED_STREAM, NULL, &m_geometryShader);
@@ -158,21 +162,23 @@ bool RockVertexBufferGenerator::createConstantBuffers(ID3D11Device* device)
 		return false;
 
 	//Create cornerStep buffer
-	bufferDesc.ByteWidth = sizeof(CB_CornerStep);
-	CB_CornerStep cornerStepBufferData;
+	bufferDesc.ByteWidth = sizeof(CB_Steps);
+	CB_Steps stepBufferData;
 
 	const XMFLOAT3& step = m_densityTextureSizeStep;
-	cornerStepBufferData.cornerStep[0] = { 0.0f, 0.0f, 0.0f, 1 };
-	cornerStepBufferData.cornerStep[1] = { step.x, 0.0f, 0.0f, 1 };
-	cornerStepBufferData.cornerStep[2] = { step.x, step.y, 0.0f, 1 };
-	cornerStepBufferData.cornerStep[3] = { 0.0f, step.y, 0.0f, 1 };
-	cornerStepBufferData.cornerStep[4] = { 0.0f, 0.0f, step.z, 1 };
-	cornerStepBufferData.cornerStep[5] = { step.x, 0.0f, step.z, 1 };
-	cornerStepBufferData.cornerStep[6] = { step.x, step.y, step.z, 1 };
-	cornerStepBufferData.cornerStep[7] = { 0.0f, step.y, step.z, 1 };
+	stepBufferData.cornerStep[0] = { 0.0f, 0.0f, 0.0f, 1 };
+	stepBufferData.cornerStep[1] = { step.x, 0.0f, 0.0f, 1 };
+	stepBufferData.cornerStep[2] = { step.x, step.y, 0.0f, 1 };
+	stepBufferData.cornerStep[3] = { 0.0f, step.y, 0.0f, 1 };
+	stepBufferData.cornerStep[4] = { 0.0f, 0.0f, step.z, 1 };
+	stepBufferData.cornerStep[5] = { step.x, 0.0f, step.z, 1 };
+	stepBufferData.cornerStep[6] = { step.x, step.y, step.z, 1 };
+	stepBufferData.cornerStep[7] = { 0.0f, step.y, step.z, 1 };
+	stepBufferData.dataStep = { 1.0f / (float)m_densityTextureSize.x, 1.f / (float)m_densityTextureSize.y, 1.f / (float)m_densityTextureSize.z, 1.f };
 
-	cbInitData.pSysMem = &cornerStepBufferData;
-	hr = device->CreateBuffer(&bufferDesc, &cbInitData, &m_constantBuffers[CornerStep]);
+
+	cbInitData.pSysMem = &stepBufferData;
+	hr = device->CreateBuffer(&bufferDesc, &cbInitData, &m_constantBuffers[Steps]);
 
 	if (FAILED(hr))
 		return false;
