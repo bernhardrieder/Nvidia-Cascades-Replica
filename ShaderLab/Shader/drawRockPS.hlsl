@@ -2,17 +2,17 @@ struct v2pConnector
 {
     float4 posH : SV_Position; //homogeneous clipspace
     float3 posW : POSITION; //worldspace coord
-    float4 color : COLOR;
-    float3 normalW : NORMAL0;
-    float3 SurfaceNormalW : NORMAL1; //local surface normal
+    float3 VertexNormalW : NORMAL0; //worldspace vertex normal
+    float3 SurfaceNormalW : NORMAL1; //worldspace surface normal
 };
 
 cbuffer PerApplication : register(b0)
 {
     float4x4 g_projection;
-    float g_discplacementDepth = 0.08f;
-    float g_initialStepIterations = 10;
-    float g_refinementStepIterations = 5;
+    float g_discplacementScale;
+    float g_initialStepIterations;
+    float g_refinementStepIterations;
+    float g_parallaxDepth;
 }
 
 cbuffer PerFrame : register(b1)
@@ -37,22 +37,19 @@ Texture2D lichen2_bmp : register(t7);
 Texture2D lichen3_bmp : register(t8);
 
 SamplerState LinearRepeatAnsio : register(s0);
+SamplerState LinearRepeat : register(s1);
 
-#define MASTER_TEX_SCALE 1.45
-#define texture_scale 0.2
-#define FLAT_SHADING 1
-#define PARALLAX 0
+#define TEXTURE_SCALE 0.2
+#define FLAT_SHADING 0
 
-#include "inoise.hlsli"
-
-float3 AddParalax(float2 coord, Texture2D bumpMap, float3 toEyeVec)
+float3 AddParallax(float2 coord, Texture2D bumpMap, float3 toEyeVec, float dispStrength)
 {
     // PARALLAX
     float h = 1;
     float2 uv = coord;
     float prev_hits;
     float ddh = 1.0 / (float) g_initialStepIterations;
-    float dd_texels_max = -toEyeVec.xy * g_discplacementDepth;
+    float dd_texels_max = -toEyeVec.xy * dispStrength;
     float2 dduv_max = 1.0 / 1024.0 * dd_texels_max;
     float2 dduv = dduv_max / (float) g_initialStepIterations;
 
@@ -66,7 +63,7 @@ float3 AddParalax(float2 coord, Texture2D bumpMap, float3 toEyeVec)
     {
         h -= ddh;
         uv += dduv;
-        float h_tex = bumpMap.SampleLevel(LinearRepeatAnsio, uv, 0).x; // .x is like orig height, but gauss-blurred 1 pixel.  (more is bad; makes the iterations really obvious)
+        float h_tex = bumpMap.SampleLevel(LinearRepeat, uv, 0).x; // .x is like orig height, but gauss-blurred 1 pixel.  (more is bad; makes the iterations really obvious)
         float is_first_hit = saturate((h_tex - h - prev_hits) * 4999999); // INTERESTING: TRY *4 INSTEAD
         hit_h += is_first_hit * h;
         prev_hits += is_first_hit;
@@ -87,7 +84,7 @@ float3 AddParalax(float2 coord, Texture2D bumpMap, float3 toEyeVec)
     {
         h -= ddh;
         uv += dduv;
-        float h_tex = bumpMap.SampleLevel(LinearRepeatAnsio, uv, 0).x; // .x is like orig height, but gauss-blurred 1 pixel.  (more is bad; makes the iterations really obvious)
+        float h_tex = bumpMap.SampleLevel(LinearRepeat, uv, 0).x; // .x is like orig height, but gauss-blurred 1 pixel.  (more is bad; makes the iterations really obvious)
         float is_first_hit = saturate((h_tex - h - prev_hits) * 4999999); // INTERESTING: TRY *4 INSTEAD
         hit_h += is_first_hit * h;
         prev_hits += is_first_hit;
@@ -98,8 +95,8 @@ float3 AddParalax(float2 coord, Texture2D bumpMap, float3 toEyeVec)
     // two points and get the EXACT intersection point.  
     float h1 = (hit_h - ddh);
     float h2 = (hit_h);
-    float v1 = bumpMap.SampleLevel(LinearRepeatAnsio, coord + dduv_max * (1 - h1), 0).x; // .x is like orig height, but gauss-blurred 1 pixel.  (more is bad; makes the iterations really obvious)
-    float v2 = bumpMap.SampleLevel(LinearRepeatAnsio, coord + dduv_max * (1 - h2), 0).x; // .x is like orig height, but gauss-blurred 1 pixel.  (more is bad; makes the iterations really obvious)
+    float v1 = bumpMap.SampleLevel(LinearRepeat, coord + dduv_max * (1 - h1), 0).x; // .x is like orig height, but gauss-blurred 1 pixel.  (more is bad; makes the iterations really obvious)
+    float v2 = bumpMap.SampleLevel(LinearRepeat, coord + dduv_max * (1 - h2), 0).x; // .x is like orig height, but gauss-blurred 1 pixel.  (more is bad; makes the iterations really obvious)
     // Q: WHY THE -1???
     float t_interp = saturate((v1 - h1) / (h2 + v1 - h1 - v2) - 1);
     hit_h = (h1 + t_interp * (h2 - h1));
@@ -110,63 +107,79 @@ float3 AddParalax(float2 coord, Texture2D bumpMap, float3 toEyeVec)
 
 float4 main(v2pConnector v2p) : SV_Target
 {
-    float3 toEyeVec = normalize(g_worldEyePosition - v2p.posW);
-    float3 normal; 
+    //----------------------- DETERMINE NORMAL FOR SHADING ---------------------------
+    float3 pixelNormalW; 
 #if FLAT_SHADING
-    normal = v2p.SurfaceNormalW;
+    pixelNormalW = v2p.SurfaceNormalW;
 #else //smooth shading
-    normal = v2p.normalW;
-    //normal.y = (v2p.normalW.y + v2p.SurfaceNormalW.y) / 2.f;
+    pixelNormalW = v2p.VertexNormalW;
 #endif
-    // BLEND WEIGHTS FOR TRI-PLANAR PROJECTION
-    //----------------------------------------------------------
-    float3 blend_weights = abs(normalize(normal)) - 0.2f;
+    
+    float3 toEyeVec = normalize(g_worldEyePosition - v2p.posW);
+    float toEyeDistance = distance(g_worldEyePosition, v2p.posW);
+
+    //----------------------- BLEND WEIGHTS FOR TRI-PLANAR PROJECTION ---------------------------
+    float3 blend_weights = abs(normalize(pixelNormalW)) - 0.2f;
     blend_weights *= 7;
     blend_weights = pow(blend_weights, 3);
     blend_weights = max(0, blend_weights);
     blend_weights /= dot(blend_weights, float3(1.f, 1.f, 1.f));
-    //blend_weights /= (blend_weights.x + blend_weights.y + blend_weights.z).xxx;
     
-    //----------------------- TRI-PLANAR PROJECTION ---------------------------
-    float4 blendedColor;
-    float3 PlanarTexScales = float3(1.f, 1.f, 1.f);
-    //float2 coord1 = v2p.posW.yz * 1.5 * PlanarTexScales.x * texture_scale * MASTER_TEX_SCALE;
-    //float2 coord2 = v2p.posW.zx * 1.5 * PlanarTexScales.y * texture_scale * MASTER_TEX_SCALE;
-    //float2 coord3 = v2p.posW.xy * 1.5 * PlanarTexScales.z * texture_scale * MASTER_TEX_SCALE;
-    float2 coord1 = v2p.posW.yz * texture_scale;
-    float2 coord2 = v2p.posW.xz * texture_scale;
-    float2 coord3 = v2p.posW.xy  * texture_scale;
+    //----------------------- TRI-PLANAR PROJECTION COORDINATES ---------------------------
+    float2 coord1 = v2p.posW.yz * TEXTURE_SCALE;
+    float2 coord2 = v2p.posW.xz * TEXTURE_SCALE;
+    float2 coord3 = v2p.posW.xy * TEXTURE_SCALE;
+    
+    //----------------------- PARALLAX ---------------------------
+    float parallaxOcclusion = 1;
+    const float parallax_depth1 = 0.40 * 4;
+    const float parallax_depth2 = 0.85 * 4;
+    float parallax_effect = saturate((parallax_depth2 - toEyeDistance) / (parallax_depth2 - parallax_depth1));
+    //float parallax_effect = 1;
 
-#if PARALLAX 
-    //parallax
-    float3 ret;
-    float3 parallax_h;
-    if (g_discplacementDepth * blend_weights.x > 0)
+    if (parallax_effect > 0)     // *very* important for good faraway framerate
     {
-        ret = AddParalax(coord1, lichen1_disp, toEyeVec);
-        coord1 = ret.xy;
-        parallax_h.x = ret.z;
-    }
-    if (g_discplacementDepth * blend_weights.y > 0)
-    {
-        ret = AddParalax(coord2, lichen2_disp, toEyeVec);
-        coord2 = ret.xy;
-        parallax_h.y = ret.z;
-    }
-    if (g_discplacementDepth * blend_weights.z > 0)
-    {
-        ret = AddParalax(coord3, lichen3_disp, toEyeVec);
-        coord3 = ret.xy;
-        parallax_h.z = ret.z;
-    }
+        float3 E2 = toEyeVec * parallax_effect;
+        //const float3 str_mults = saturate((abs(pixelNormalW) - 0.4) * 3);
+        //const float3 parallax_str = str_mults.xyz * g_discplacementScale.xxx * g_parallaxDepth.xxx; //25;//15;//11; // 550 = WHOA
+        const float3 parallax_str = g_discplacementScale.xxx * g_parallaxDepth.xxx; //25;//15;//11; // 550 = WHOA
+        float3 ret;
+        //float3 parallax_hit;
+        if (parallax_str.x * blend_weights.x > 0)
+        {
+            ret = AddParallax(coord1, lichen1_disp, E2.yzx, parallax_str.x);
+            coord1 = ret.xy;
+            //parallax_hit.x = ret.z;
+        }
+        if (parallax_str.y * blend_weights.y > 0)
+        {
+            ret = AddParallax(coord2, lichen2_disp, E2.xzy, parallax_str.y);
+            coord2 = ret.xy;
+            //parallax_hit.y = ret.z;
+        }
+        if (parallax_str.z * blend_weights.z > 0)
+        {
+            ret = AddParallax(coord3, lichen3_disp, E2.xyz, parallax_str.z);
+            coord3 = ret.xy;
+            //parallax_hit.z = ret.z;
+        }
 
-    float blended_parallax_h = dot(blend_weights, parallax_h);
-#endif
-
+        //float blended_parallax_hit = dot(blend_weights, parallax_hit);
+        //parallaxOcclusion = lerp(1, 0.77 + 0.23 * saturate(blended_parallax_hit), parallax_effect);
+    }
+    
+    //----------------------- SAMPLE AND BLEND COLOR FROM TEXTURES ---------------------------
     float4 mossCol1 = lichen1.Sample(LinearRepeatAnsio, coord1);
     float4 mossCol2 = lichen2.Sample(LinearRepeatAnsio, coord2);
     float4 mossCol3 = lichen3.Sample(LinearRepeatAnsio, coord3);
 
+    float4 blendedColor = mossCol1.xyzw * blend_weights.xxxx +
+                          mossCol2.xyzw * blend_weights.yyyy +
+                          mossCol3.xyzw * blend_weights.zzzz;
+    blendedColor *= parallaxOcclusion.xxxx;
+
+    
+    //----------------------- SAMPLE AND BLEND NORMAL FROM BUMP MAP ---------------------------
     float3 mossBmp[3];
     mossBmp[0].yz = lichen1_bmp.Sample(LinearRepeatAnsio, coord1 * float2(1, 1)).xy - 0.5f;
     mossBmp[0].x = 0;
@@ -175,33 +188,18 @@ float4 main(v2pConnector v2p) : SV_Target
     mossBmp[2].xy = lichen3_bmp.Sample(LinearRepeatAnsio, coord3 * float2(1, 1)).xy - 0.5f;
     mossBmp[2].z = 0;
 
-    mossBmp[0].yz *= -1.5;
-    mossBmp[1].xz *= -1.5;
-    mossBmp[2].xy *= -1.5;
+    mossBmp[0].yz *= -1;
+    mossBmp[1].xz *= -1;
+    mossBmp[2].xy *= -1;
 
-    blendedColor =  mossCol1.xyzw * blend_weights.xxxx +
-                    mossCol2.xyzw * blend_weights.yyyy +
-                    mossCol3.xyzw * blend_weights.zzzz ;
+    float3 mossBumpMapNormal = mossBmp[0] * blend_weights.xxx +
+                               mossBmp[1] * blend_weights.yyy +
+                               mossBmp[2] * blend_weights.zzz;
 
-    float3 moss_bump =  mossBmp[0] * blend_weights.xxx +
-                        mossBmp[1] * blend_weights.yyy +
-                        mossBmp[2] * blend_weights.zzz;
-
-    //// --------------------- LO-FREQ COLOR NOISE -------------------
-    //// add low-frequency colorization from noise:
-    //{
-    //    const float spread = 0.10; //0.09;
-    //    moss_color.xyz *= (1 - spread) + (spread * 2) * float3(inoise(moss_color.xxx), inoise(moss_color.yyy), inoise(moss_color.zzz));
-    //}
-
-    //return blendedColor;
-
-    v2p.color = blendedColor;
-    //simple lightning function
-    //----------------------------------------------------------
-    float4 lightIntensity = dot(g_sunLightDirection.xyz, normalize(normal + moss_bump));
-    float4 color = saturate(lightIntensity * v2p.color);
-    float4 ambient = (0.1f * v2p.color);
-    color = normalize(float4(color.xyz, 1) + ambient);
-    return color;
+    //----------------------- SIMPLE LIGHTNING FUNCTION ---------------------------
+    float4 lightIntensity = dot(g_sunLightDirection.xyz, normalize(pixelNormalW + mossBumpMapNormal));
+    float4 final_color = saturate(lightIntensity * blendedColor);
+    float4 ambient = (0.1f * blendedColor);
+    final_color = normalize((float4(final_color.xyz, 1) + ambient));
+    return final_color;
 }

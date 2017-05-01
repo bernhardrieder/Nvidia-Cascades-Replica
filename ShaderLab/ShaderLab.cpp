@@ -10,9 +10,10 @@ ShaderLab::ShaderLab(HINSTANCE hInstance, int nCmdShow) : D3D11App(hInstance, nC
 {
 	m_cbPerFrame.AppTime = 0;	
 	
-	m_cbPerApplication.DisplacementDepth = 0.08f;
-	m_cbPerApplication.InitialStepIterations = 10;
-	m_cbPerApplication.RefinementStepIterations = 5;
+	m_cbPerApplication.DisplacementScale = 2.f;
+	m_cbPerApplication.InitialStepIterations = 24;
+	m_cbPerApplication.RefinementStepIterations = 12;
+	m_cbPerApplication.ParallaxDepth = 15;
 }
 
 ShaderLab::~ShaderLab()
@@ -120,15 +121,16 @@ void ShaderLab::render(float deltaTime)
 
 	m_deviceContext->PSSetShader(m_simplePS, nullptr, 0);
 	m_deviceContext->PSSetConstantBuffers(0, 2, m_constantBuffers);
-	auto sampler = m_commonStates->PointWrap();
+	auto sampler = m_commonStates->LinearWrap();
 	m_deviceContext->PSSetSamplers(0, 1, &m_lichenSampler);
-	m_deviceContext->PSSetShaderResources(0, 1, &m_texturesSRVs[0]);
+	m_deviceContext->PSSetSamplers(1, 1, &sampler);
+	m_deviceContext->PSSetShaderResources(0, 1, &m_texturesSRVs[14]);
 	m_deviceContext->PSSetShaderResources(1, 1, &m_texturesSRVs[3]);
 	m_deviceContext->PSSetShaderResources(2, 1, &m_texturesSRVs[18]);
-	m_deviceContext->PSSetShaderResources(3, 1, &m_texturesDispSRVs[0]);
+	m_deviceContext->PSSetShaderResources(3, 1, &m_texturesDispSRVs[14]);
 	m_deviceContext->PSSetShaderResources(4, 1, &m_texturesDispSRVs[3]);
 	m_deviceContext->PSSetShaderResources(5, 1, &m_texturesDispSRVs[18]);
-	m_deviceContext->PSSetShaderResources(6, 1, &m_texturesBumpSRVs[0]);
+	m_deviceContext->PSSetShaderResources(6, 1, &m_texturesBumpSRVs[14]);
 	m_deviceContext->PSSetShaderResources(7, 1, &m_texturesBumpSRVs[3]);
 	m_deviceContext->PSSetShaderResources(8, 1, &m_texturesBumpSRVs[18]);
 
@@ -292,18 +294,37 @@ void ShaderLab::checkAndProcessKeyboardInput(float deltaTime)
 	m_sunPhi = MathHelper::Clamp(m_sunPhi, 0.1f, XM_PIDIV2);
 
 
+	//per app (mostly parallax elements) constant buffer
 	if (GetAsyncKeyState('O') & 0x8000)
-		m_cbPerApplication.DisplacementDepth -= 0.01f * deltaTime;
+	{
+		m_cbPerApplication.DisplacementScale -= 0.1f * deltaTime;
+		if (m_cbPerApplication.DisplacementScale < 0.0f)
+			m_cbPerApplication.DisplacementScale = 0.f;
+	}
 	if (GetAsyncKeyState('P') & 0x8000)
-		m_cbPerApplication.DisplacementDepth += 0.01f * deltaTime;
+		m_cbPerApplication.DisplacementScale += 0.1f * deltaTime;
 	if (GetAsyncKeyState('K') & 0x8000)
-		m_cbPerApplication.InitialStepIterations -= 1;
+	{
+		if (m_cbPerApplication.InitialStepIterations >= 4)
+		{
+			m_cbPerApplication.InitialStepIterations -= 2;
+			m_cbPerApplication.RefinementStepIterations = m_cbPerApplication.InitialStepIterations / 2;
+		}
+	}
 	if (GetAsyncKeyState('L') & 0x8000)
-		m_cbPerApplication.InitialStepIterations += 1;
+	{
+		m_cbPerApplication.InitialStepIterations += 2;
+		m_cbPerApplication.RefinementStepIterations = m_cbPerApplication.InitialStepIterations / 2;
+	}
 	if (GetAsyncKeyState('N') & 0x8000)
-		m_cbPerApplication.RefinementStepIterations -= 1;
+	{
+		m_cbPerApplication.ParallaxDepth -= 1.f * deltaTime;
+		if (m_cbPerApplication.ParallaxDepth < 0.0f)
+			m_cbPerApplication.ParallaxDepth = 0.f;
+	}
 	if (GetAsyncKeyState('M') & 0x8000)
-		m_cbPerApplication.RefinementStepIterations += 1;
+		m_cbPerApplication.ParallaxDepth += 1.f * deltaTime;
+
 
 	if (GetAsyncKeyState('O') & 0x8000 || GetAsyncKeyState('P') & 0x8000 ||
 		GetAsyncKeyState('K') & 0x8000 || GetAsyncKeyState('L') & 0x8000 ||

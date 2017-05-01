@@ -9,7 +9,6 @@ struct v2pConnector
 {
     float4 posH : SV_Position; //homogeneous clipspace
     float3 posW : POSITION; //worldspace coord
-    float4 color : COLOR;
     float3 normalW : NORMAL0;
     float3 SurfaceNormalW : NORMAL1; //local surface normal
 };
@@ -61,7 +60,5 @@ v2pConnector main(a2vConnector a2v)
     //v2p.posH = mul(worldViewProj, float4(a2v.wsPosition.xyz, 1.f));
     v2p.posH = mul(g_viewProj, float4(v2p.posW.xyz, 1.f));
     
-    v2p.color = float4(1.f, 0.f, 0.f, 1.0f);
-
     return v2p;
 }

@@ -56,9 +56,10 @@ private:
 	struct CbPerApplication
 	{
 		XMMATRIX Proj;
-		float DisplacementDepth;
+		float DisplacementScale;
 		float InitialStepIterations;
 		float RefinementStepIterations;
+		float ParallaxDepth;
 	};
 
 	struct CbPerFrame
