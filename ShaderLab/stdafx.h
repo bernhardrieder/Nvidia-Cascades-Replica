@@ -26,6 +26,7 @@
 #include <d3dcompiler.h>
 #include <DirectXMath.h>
 #include <DirectXColors.h>
+#include <DirectXCollision.h>
 
 // Link library dependencies
 #pragma comment(lib, "d3d11.lib")
@@ -58,6 +59,8 @@ inline void SafeRelease(T& ptr)
 #include "Camera.h"
 #include "RockVertexBufferGenerator.h"
 #include "Density3DTextureGenerator.h"
+#include "CollisionDetectionHelper.h"
+#include "KdTree.h"
 
 //directx toolkit
 #include "CommonStates.h"

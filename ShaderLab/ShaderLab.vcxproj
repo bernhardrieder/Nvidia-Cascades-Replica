@@ -140,8 +140,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Camera.h" />
+    <ClInclude Include="CollisionDetectionHelper.h" />
     <ClInclude Include="D3D11App.h" />
     <ClInclude Include="Density3DTextureGenerator.h" />
+    <ClInclude Include="KdTree.h" />
     <ClInclude Include="LookUpTables.h" />
     <ClInclude Include="MathHelper.h" />
     <ClInclude Include="Resource.h" />
@@ -153,8 +155,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Camera.cpp" />
+    <ClCompile Include="CollisionDetectionHelper.cpp" />
     <ClCompile Include="D3D11App.cpp" />
     <ClCompile Include="Density3DTextureGenerator.cpp" />
+    <ClCompile Include="KdTree.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="RockVertexBufferGenerator.cpp" />
     <ClCompile Include="ShaderLab.cpp" />
