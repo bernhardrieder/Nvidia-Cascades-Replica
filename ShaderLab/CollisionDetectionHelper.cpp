@@ -92,6 +92,8 @@ bool Triangle::LessThan(Triangle* left, Triangle* right, Axis axis)
 
 Triangle::Triangle() : Triangle(Vector3::Zero, Vector3::Zero, Vector3::Zero) {}
 
+Triangle::Triangle(Triangle&& other) noexcept : Triangle(other.m_v0, other.m_v1, other.m_v2){}
+
 Triangle::Triangle(DirectX::SimpleMath::Vector3 p1, DirectX::SimpleMath::Vector3 p2, DirectX::SimpleMath::Vector3 p3) :m_v0(p1), m_v1(p2), m_v2(p3)
 {
 	createBoundingBox();

@@ -98,7 +98,10 @@ void ShaderLab::render(float deltaTime)
 		m_isDensityTextureGenerated = m_densityTexGenerator.Generate(m_deviceContext);
 
 	if (m_isDensityTextureGenerated && !m_isRockVertexBufferGenerated)
+	{
 		m_isRockVertexBufferGenerated = m_rockVBGenerator.Generate(m_deviceContext, m_densityTexGenerator.GetTexture3DShaderResourceView());
+		m_shapesTriangles = m_rockVBGenerator.extractTrianglesFromVertexBuffer(m_deviceContext, m_worldMatrix);
+	}
 
 	m_deviceContext->ClearRenderTargetView(m_renderTargetView, DirectX::Colors::CornflowerBlue);
 	m_deviceContext->ClearDepthStencilView(m_depthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
@@ -183,9 +186,9 @@ bool ShaderLab::loadShaders()
 	// Create the input layout for the vertex shader.
 	D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
 	{
-		{"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(VertexPosNormal,Position), D3D11_INPUT_PER_VERTEX_DATA, 0},
-		{"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(VertexPosNormal,Normal), D3D11_INPUT_PER_VERTEX_DATA, 0},
-		{ "NORMAL", 1, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(VertexPosNormal,SurfaceNormal), D3D11_INPUT_PER_VERTEX_DATA, 0 }
+		{"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(VertexPosNormal,LocalPosition), D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(VertexPosNormal,LocalVertexNormal), D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{ "NORMAL", 1, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(VertexPosNormal,LocalSurfaceNormal), D3D11_INPUT_PER_VERTEX_DATA, 0 }
 	};
 
 	hr = m_device->CreateInputLayout(vertexLayoutDesc, _countof(vertexLayoutDesc), vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize(), &m_inputLayoutSimpleVS);
@@ -409,4 +412,26 @@ bool ShaderLab::createSampler(ID3D11Device* device)
 void ShaderLab::releaseSampler()
 {
 	SafeRelease(m_lichenSampler);
+}
+
+HitResult ShaderLab::raycast(int sx, int sy, Ray& outRay)
+{	
+	// Compute picking ray in view space.
+	float vx = (((+2.0f*sx) / m_windowWidth) - 1.0f) / m_camera.GetProj()(0, 0);
+	float vy = (((-2.0f*sy) / m_windowHeight) + 1.0f) / m_camera.GetProj()(1, 1);
+
+	Matrix invView = m_camera.GetView().Invert();
+
+	// Ray definition in view space.
+	//Vector3 rayOrigin = Vector3(invView._41, invView._42, invView._43); //current eye position in world space
+	//or define like this -> Vector3::Zero is view space origin and we transform it to world space with the inverse of the view matrix
+	Vector3 rayOrigin = Vector3::Transform(Vector3::Zero, invView);
+
+	Vector3 rayDir = Vector3(vx, vy, -1.0f);
+	//convert to world space
+	rayDir = Vector3::TransformNormal(rayDir, invView);
+	rayDir.Normalize();
+
+	outRay = Ray(rayOrigin, rayDir);
+	return KDNode::RayCast(m_kdTreeRoot.get(), outRay);
 }

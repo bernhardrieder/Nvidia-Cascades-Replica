@@ -5,8 +5,11 @@
 #include "RockVertexBufferGenerator.h"
 #include "Density3DTextureGenerator.h"
 #include <SimpleMath.h>
+#include "CollisionDetectionHelper.h"
+#include "KdTree.h"
 
 using namespace DirectX;
+using namespace DirectX::SimpleMath;
 
 class ShaderLab : public D3D11App
 {
@@ -35,6 +38,8 @@ private:
 	void releaseTextures();
 	bool createSampler(ID3D11Device* device);
 	void releaseSampler();
+
+	HitResult raycast(int sx, int sy, DirectX::SimpleMath::Ray& outRay);
 private:
 	// Shader resources
 	enum ShaderConstanBufferType
@@ -48,9 +53,9 @@ private:
 	// Vertex data for a colored cube.
 	struct VertexPosNormal
 	{
-		XMFLOAT4 Position;
-		XMFLOAT3 Normal;
-		XMFLOAT3 SurfaceNormal;
+		DirectX::XMFLOAT4 LocalPosition;
+		DirectX::XMFLOAT3 LocalVertexNormal;
+		DirectX::XMFLOAT3 LocalSurfaceNormal;
 	};
 
 	struct CbPerApplication
@@ -127,4 +132,13 @@ private:
 	std::wstring m_textureBumpFilesPath = L"Assets/Textures/bump/";
 	std::wstring m_textureGenericFilename = L"lichen";
 	std::wstring m_textureFilenameExtension = L".dds";
+
+	//Raycasting
+	std::unique_ptr<KDNode> m_kdTreeRoot;
+	std::vector<Triangle> m_shapesTriangles;
+	bool m_renderKdTree = false;
+	bool m_rayCastHit = false;
+	bool m_renderRayCast = false;
+	Ray m_rayCast;
+	Vector3 m_rayCastHitPos;
 };

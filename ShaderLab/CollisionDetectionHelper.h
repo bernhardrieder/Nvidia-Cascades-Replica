@@ -17,7 +17,7 @@ public:
 	static bool LessThan(Triangle* left, Triangle* right, Axis axis);
 
 	Triangle();
-	Triangle(Triangle&&) = delete;
+	Triangle(Triangle&&) noexcept;
 	Triangle(const Triangle&);
 	Triangle(DirectX::SimpleMath::Vector3 p1, DirectX::SimpleMath::Vector3 p2, DirectX::SimpleMath::Vector3 p3);
 	Triangle& operator= (const Triangle& other);
