@@ -65,8 +65,7 @@ bool ShaderLab::Initialize()
 
 void ShaderLab::update(float deltaTime)
 {
-	checkAndProcessKeyboardInput(deltaTime);
-
+	D3D11App::update(deltaTime);
 
 	m_cbPerFrame.View = m_camera.GetView();
 	m_cbPerFrame.ViewProj = m_camera.GetView() * m_camera.GetProj();
@@ -100,7 +99,7 @@ void ShaderLab::render(float deltaTime)
 	if (m_isDensityTextureGenerated && !m_isRockVertexBufferGenerated)
 	{
 		m_isRockVertexBufferGenerated = m_rockVBGenerator.Generate(m_deviceContext, m_densityTexGenerator.GetTexture3DShaderResourceView());
-		m_shapesTriangles = m_rockVBGenerator.extractTrianglesFromVertexBuffer(m_deviceContext, m_worldMatrix);
+		m_rockTrianglesTransformed = m_rockVBGenerator.extractTrianglesFromVertexBuffer(m_deviceContext, m_worldMatrix);
 	}
 
 	m_deviceContext->ClearRenderTargetView(m_renderTargetView, DirectX::Colors::CornflowerBlue);
@@ -232,81 +231,50 @@ void ShaderLab::onResize()
 	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Application], 0, nullptr, &m_cbPerApplication, 0, 0);
 }
 
-void ShaderLab::onMouseDown(WPARAM btnState, int x, int y)
-{
-	D3D11App::onMouseDown(btnState, x, y);
-	m_lastMousePos.x = x;
-	m_lastMousePos.y = y;
-
-	SetCapture(m_windowHandle);
-}
-
-void ShaderLab::onMouseUp(WPARAM btnState, int x, int y)
-{
-	D3D11App::onMouseUp(btnState, x, y);
-	ReleaseCapture();
-}
-
-void ShaderLab::onMouseMove(WPARAM btnState, int x, int y)
-{
-	D3D11App::onMouseMove(btnState, x, y);
-	if ((btnState & MK_LBUTTON) != 0)
-	{
-		// Make each pixel correspond to a quarter of a degree.
-		float dx = DirectX::XMConvertToRadians(0.10f * static_cast<float>(x - m_lastMousePos.x));
-		float dy = DirectX::XMConvertToRadians(0.10f * static_cast<float>(y - m_lastMousePos.y));
-
-		m_camera.Pitch(dy);
-		m_camera.RotateY(dx);
-	}
-
-	m_lastMousePos.x = x;
-	m_lastMousePos.y = y;
-}
-
 void ShaderLab::checkAndProcessKeyboardInput(float deltaTime)
 {
+	auto state = m_keyboard->GetState();
+	if (state.Escape)
+	{
+		PostQuitMessage(0);
+	}
+
+	m_keyboardStateTracker.Update(state);
+	
+	//m_keyboardStateTracker.IsKeyPressed(Keyboard::Keys::W) --> returns true if button is pressed (the first time)
+	//state.W --> return true if button is held
 	static float cameraSpeed = 10.f;
-	if (GetAsyncKeyState('W') & 0x8000)
+	if (state.W)
 		m_camera.Walk(cameraSpeed * deltaTime);
-
-	if (GetAsyncKeyState('S') & 0x8000)
+	if (state.S)
 		m_camera.Walk(-cameraSpeed * deltaTime);
-
-	if (GetAsyncKeyState('A') & 0x8000)
+	if (state.A)
 		m_camera.Strafe(-cameraSpeed * deltaTime);
-
-	if (GetAsyncKeyState('D') & 0x8000)
+	if (state.D)
 		m_camera.Strafe(cameraSpeed * deltaTime);
-
 	m_camera.UpdateViewMatrix();
 
 	//SUN ROTATION
-	if (GetAsyncKeyState(VK_LEFT) & 0x8000)
+	m_sunPhi = MathHelper::Clamp(m_sunPhi, 0.1f, XM_PIDIV2);
+	if (state.Up)
+		m_sunPhi += 1.0f*deltaTime;
+	if (state.Down)
+		m_sunPhi -= 1.0f*deltaTime;
+	if (state.Left)
 		m_sunTheta -= 1.0f*deltaTime;
-
-	if (GetAsyncKeyState(VK_RIGHT) & 0x8000)
+	if (state.Right)
 		m_sunTheta += 1.0f*deltaTime;
 
-	if (GetAsyncKeyState(VK_UP) & 0x8000)
-		m_sunPhi += 1.0f*deltaTime;
-
-	if (GetAsyncKeyState(VK_DOWN) & 0x8000)
-		m_sunPhi -= 1.0f*deltaTime;
-
-	m_sunPhi = MathHelper::Clamp(m_sunPhi, 0.1f, XM_PIDIV2);
-
-
 	//per app (mostly parallax elements) constant buffer
-	if (GetAsyncKeyState('O') & 0x8000)
+	if (state.O)
 	{
 		m_cbPerApplication.DisplacementScale -= 0.1f * deltaTime;
 		if (m_cbPerApplication.DisplacementScale < 0.0f)
 			m_cbPerApplication.DisplacementScale = 0.f;
 	}
-	if (GetAsyncKeyState('P') & 0x8000)
+	if(state.P)
 		m_cbPerApplication.DisplacementScale += 0.1f * deltaTime;
-	if (GetAsyncKeyState('K') & 0x8000)
+	if (m_keyboardStateTracker.IsKeyPressed(Keyboard::Keys::K))
 	{
 		if (m_cbPerApplication.InitialStepIterations >= 4)
 		{
@@ -314,26 +282,52 @@ void ShaderLab::checkAndProcessKeyboardInput(float deltaTime)
 			m_cbPerApplication.RefinementStepIterations = m_cbPerApplication.InitialStepIterations / 2;
 		}
 	}
-	if (GetAsyncKeyState('L') & 0x8000)
+	if (m_keyboardStateTracker.IsKeyPressed(Keyboard::Keys::L))
 	{
 		m_cbPerApplication.InitialStepIterations += 2;
 		m_cbPerApplication.RefinementStepIterations = m_cbPerApplication.InitialStepIterations / 2;
 	}
-	if (GetAsyncKeyState('N') & 0x8000)
+	if (state.N)
 	{
 		m_cbPerApplication.ParallaxDepth -= 1.f * deltaTime;
 		if (m_cbPerApplication.ParallaxDepth < 0.0f)
 			m_cbPerApplication.ParallaxDepth = 0.f;
 	}
-	if (GetAsyncKeyState('M') & 0x8000)
+	if (state.M)
 		m_cbPerApplication.ParallaxDepth += 1.f * deltaTime;
 
-
-	if (GetAsyncKeyState('O') & 0x8000 || GetAsyncKeyState('P') & 0x8000 ||
-		GetAsyncKeyState('K') & 0x8000 || GetAsyncKeyState('L') & 0x8000 ||
-		GetAsyncKeyState('N') & 0x8000 || GetAsyncKeyState('M') & 0x8000)
+	if (state.O || state.P || state.K || state.L ||	state.N || state.M)
 		m_updateCbPerApplication = true;
+}
 
+void ShaderLab::checkAndProcessMouseInput(float deltaTime)
+{
+	auto state = m_mouse->GetState();
+	auto lastState = m_mouseStateTracker.GetLastState();
+	m_mouseStateTracker.Update(state);
+	if (m_mouseStateTracker.leftButton == m_mouseStateTracker.HELD)
+	{
+		// Make each pixel correspond to a quarter of a degree.
+		float dx = DirectX::XMConvertToRadians(0.10f*static_cast<float>(state.x - lastState.x));
+		float dy = DirectX::XMConvertToRadians(0.10f*static_cast<float>(state.y - lastState.y));
+
+		m_camera.Pitch(dy);
+		m_camera.RotateY(dx);
+		m_camera.UpdateViewMatrix();
+	}
+	//if (m_mouseStateTracker.rightButton == m_mouseStateTracker.PRESSED)
+	//{
+	//	m_rayCastHit = false;
+	//	m_renderRayCast = true;
+
+	//	HitResult hitResult = raycast(state.x, state.y, m_rayCast);
+	//	if (hitResult.IsHit)
+	//	{
+	//		m_rayCastHit = true;
+	//		m_rayCastHitPos = hitResult.ImpactPoint;
+	//		std::cout << "Raycast hit object! Position: (" << std::to_string(m_rayCastHitPos.x) << ", " << std::to_string(m_rayCastHitPos.y) << ", " << std::to_string(m_rayCastHitPos.z) << ")\n";
+	//	}
+	//}
 }
 
 bool ShaderLab::initDirectX()
@@ -433,5 +427,5 @@ HitResult ShaderLab::raycast(int sx, int sy, Ray& outRay)
 	rayDir.Normalize();
 
 	outRay = Ray(rayOrigin, rayDir);
-	return KDNode::RayCast(m_kdTreeRoot.get(), outRay);
+	return KDNode::RayCast(m_rockKdTreeRoot.get(), outRay);
 }

@@ -27,10 +27,8 @@ private:
 	bool loadShaders();
 	void unloadShaders();
 	void onResize() override;
-	void onMouseDown(WPARAM btnState, int x, int y) override;
-	void onMouseUp(WPARAM btnState, int x, int y) override;
-	void onMouseMove(WPARAM btnState, int x, int y) override;
-	void checkAndProcessKeyboardInput(float deltaTime);
+	void checkAndProcessKeyboardInput(float deltaTime) override;
+	void checkAndProcessMouseInput(float deltaTime) override;
 	bool initDirectX() override;
 	void cleanup() override;
 
@@ -110,7 +108,6 @@ private:
 	ID3D11Buffer* m_constantBuffers[NumConstantBuffers];
 	std::unique_ptr<DirectX::CommonStates> m_commonStates;
 
-	POINT m_lastMousePos;
 	Camera m_camera;
 	SimpleMath::Matrix m_worldMatrix = SimpleMath::Matrix::Identity;;
 
@@ -134,11 +131,12 @@ private:
 	std::wstring m_textureFilenameExtension = L".dds";
 
 	//Raycasting
-	std::unique_ptr<KDNode> m_kdTreeRoot;
-	std::vector<Triangle> m_shapesTriangles;
-	bool m_renderKdTree = false;
+	std::unique_ptr<KDNode> m_rockKdTreeRoot;
+	std::vector<Triangle> m_rockTrianglesTransformed;
 	bool m_rayCastHit = false;
 	bool m_renderRayCast = false;
 	Ray m_rayCast;
 	Vector3 m_rayCastHitPos;
+
+
 };
