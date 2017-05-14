@@ -48,6 +48,8 @@ inline void SafeRelease(T& ptr)
 #include <vector>
 #include <memory>
 #include <wchar.h>
+#include <iostream>
+#include <minwinbase.h>
 #include <exception>
 
 //directx toolkit

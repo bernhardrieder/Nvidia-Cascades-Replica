@@ -1,7 +1,6 @@
 #include "stdafx.h"
 #include "ShaderLab.h"
 #include <fstream>
-#include <minwinbase.h>
 
 using namespace DirectX;
 using namespace DirectX::SimpleMath;
@@ -97,18 +96,25 @@ void ShaderLab::render()
 	assert(m_deviceContext);
 
 	if (!m_isDensityTextureGenerated)
+	{
+		std::cout << "Create density 3D texture ...";
 		m_isDensityTextureGenerated = m_densityTexGenerator.Generate(m_deviceContext);
+		std::cout << " finished!\n";
+	}
 
 	if (m_isDensityTextureGenerated && !m_isRockVertexBufferGenerated)
 	{
+		std::cout << "Create rock vertexbuffer and extract triangles from vertexbuffer ...";
 		m_isRockVertexBufferGenerated = m_rockVBGenerator.Generate(m_deviceContext, m_densityTexGenerator.GetTexture3DShaderResourceView());
 		m_rockTrianglesTransformed = m_rockVBGenerator.extractTrianglesFromVertexBuffer(m_deviceContext, m_worldMatrix);
+		std::cout << " finished!\n";
 
 		std::vector<Triangle*> triPointer;
 		for (auto& triangle : m_rockTrianglesTransformed)
 			triPointer.push_back(&triangle);
-
+		std::cout << "Build kdTree ...";
 		m_rockKdTreeRoot.reset(KDNode::Build(triPointer, 0));
+		std::cout << " finished!\n";
 	}
 
 	m_deviceContext->ClearRenderTargetView(m_renderTargetView, DirectX::Colors::CornflowerBlue);
@@ -333,9 +339,7 @@ void ShaderLab::checkAndProcessMouseInput(float deltaTime)
 		Ray resultRay;
 		m_raycastHitResult = raycast(state.x, state.y, resultRay);
 		if (m_raycastHitResult.IsHit)
-		{
-			//std::cout << "Raycast hit object! Position: (" << std::to_string(m_rayCastHitPos.x) << ", " << std::to_string(m_rayCastHitPos.y) << ", " << std::to_string(m_rayCastHitPos.z) << ")\n";
-		}
+			std::cout << "Raycast hit object! Position: (" << std::to_string(m_raycastHitResult.ImpactPoint.x) << ", " << std::to_string(m_raycastHitResult.ImpactPoint.y) << ", " << std::to_string(m_raycastHitResult.ImpactPoint.z) << ")\n";
 	}
 }
 
