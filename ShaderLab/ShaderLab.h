@@ -23,7 +23,7 @@ public:
 
 private:	
 	void update(float deltaTime) override;
-	void render(float deltaTime) override;
+	void render() override;
 	bool loadShaders();
 	void unloadShaders();
 	void onResize() override;
@@ -133,10 +133,6 @@ private:
 	//Raycasting
 	std::unique_ptr<KDNode> m_rockKdTreeRoot;
 	std::vector<Triangle> m_rockTrianglesTransformed;
-	bool m_rayCastHit = false;
-	bool m_renderRayCast = false;
-	Ray m_rayCast;
-	Vector3 m_rayCastHitPos;
-
-
+	HitResult m_raycastHitResult;
+	std::unique_ptr<DirectX::GeometricPrimitive> m_raycastHitSphere;
 };

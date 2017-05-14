@@ -26,7 +26,7 @@ protected:
 	virtual void checkAndProcessKeyboardInput(float deltaTime) = 0;
 	virtual void checkAndProcessMouseInput(float deltaTime) = 0;
 	//called in Gameloop by Run()
-	virtual void render(float deltaTime);
+	virtual void render();
 	virtual void cleanup();
 	virtual void onResize();
 

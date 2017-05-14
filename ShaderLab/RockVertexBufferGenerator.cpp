@@ -307,15 +307,20 @@ std::vector<Triangle> RockVertexBufferGenerator::extractTrianglesFromVertexBuffe
 		
 		for (size_t i = 0; i < stats.GSPrimitives*3;)
 		{
+			bool notANumberDetected = false;
 			Vector3 vertices[3];
 			for(auto& vertex : vertices)
 			{
+				if (pRaw[i].LocalPosition.x != pRaw[i].LocalPosition.x || pRaw[i].LocalPosition.y != pRaw[i].LocalPosition.y || pRaw[i].LocalPosition.z != pRaw[i].LocalPosition.z)
+					notANumberDetected = true;
+
 				vertex = Vector3(pRaw[i].LocalPosition.x, pRaw[i].LocalPosition.y, pRaw[i].LocalPosition.z);
 				vertex = XMVector3Transform(vertex, triangleSRT);
 				++i;
 			}
 
-			triangles.push_back(Triangle(vertices[0], vertices[1], vertices[2]));
+			if(!notANumberDetected)
+				triangles.push_back(Triangle(vertices[0], vertices[1], vertices[2]));
 		}
 
 		pDeviceContext->Unmap(m_stagedVertexBuffer, 0);

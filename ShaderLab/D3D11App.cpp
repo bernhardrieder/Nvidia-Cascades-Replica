@@ -88,14 +88,14 @@ int D3D11App::Run()
 			m_deltaTime = std::min<float>(m_deltaTime, maxTimeStep);
 
 			update(m_deltaTime);
-			render(m_deltaTime);
+			render();
 		}
 	}
 
 	return static_cast<int>(msg.wParam);
 }
 
-void D3D11App::render(float deltaTime)
+void D3D11App::render()
 {
 	assert(m_device);
 	assert(m_deviceContext);

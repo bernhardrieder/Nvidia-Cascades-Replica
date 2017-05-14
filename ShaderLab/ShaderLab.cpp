@@ -60,6 +60,9 @@ bool ShaderLab::Initialize()
 	m_worldMatrix = Matrix::CreateWorld(Vector3(0, 0, 0), Vector3::Forward, Vector3::Up);
 	m_worldMatrix *= Matrix::CreateScale(10, 10, 10);
 
+	m_rockKdTreeRoot = std::make_unique<KDNode>();
+	m_raycastHitSphere = DirectX::GeometricPrimitive::CreateSphere(m_deviceContext);
+
 	return true;
 }
 
@@ -88,7 +91,7 @@ void ShaderLab::update(float deltaTime)
 	}
 }
 
-void ShaderLab::render(float deltaTime)
+void ShaderLab::render()
 {
 	assert(m_device);
 	assert(m_deviceContext);
@@ -100,6 +103,12 @@ void ShaderLab::render(float deltaTime)
 	{
 		m_isRockVertexBufferGenerated = m_rockVBGenerator.Generate(m_deviceContext, m_densityTexGenerator.GetTexture3DShaderResourceView());
 		m_rockTrianglesTransformed = m_rockVBGenerator.extractTrianglesFromVertexBuffer(m_deviceContext, m_worldMatrix);
+
+		std::vector<Triangle*> triPointer;
+		for (auto& triangle : m_rockTrianglesTransformed)
+			triPointer.push_back(&triangle);
+
+		m_rockKdTreeRoot.reset(KDNode::Build(triPointer, 0));
 	}
 
 	m_deviceContext->ClearRenderTargetView(m_renderTargetView, DirectX::Colors::CornflowerBlue);
@@ -136,12 +145,16 @@ void ShaderLab::render(float deltaTime)
 	m_deviceContext->PSSetShaderResources(7, 1, &m_texturesBumpSRVs[3]);
 	m_deviceContext->PSSetShaderResources(8, 1, &m_texturesBumpSRVs[18]);
 
-
 	m_deviceContext->OMSetRenderTargets(1, &m_renderTargetView, m_depthStencilView);
 	m_deviceContext->OMSetDepthStencilState(m_depthStencilState, 1);
 
 	m_deviceContext->DrawAuto();
 
+	//TODO: create own vertex buffer?
+	//render raycast hit
+	if (m_raycastHitResult.IsHit)
+		m_raycastHitSphere->Draw(Matrix::CreateTranslation(m_raycastHitResult.ImpactPoint), m_camera.GetView(), m_camera.GetProj());
+	
 	//Present Frame!!
 	m_swapChain->Present(0, 0);
 }
@@ -315,19 +328,15 @@ void ShaderLab::checkAndProcessMouseInput(float deltaTime)
 		m_camera.RotateY(dx);
 		m_camera.UpdateViewMatrix();
 	}
-	//if (m_mouseStateTracker.rightButton == m_mouseStateTracker.PRESSED)
-	//{
-	//	m_rayCastHit = false;
-	//	m_renderRayCast = true;
-
-	//	HitResult hitResult = raycast(state.x, state.y, m_rayCast);
-	//	if (hitResult.IsHit)
-	//	{
-	//		m_rayCastHit = true;
-	//		m_rayCastHitPos = hitResult.ImpactPoint;
-	//		std::cout << "Raycast hit object! Position: (" << std::to_string(m_rayCastHitPos.x) << ", " << std::to_string(m_rayCastHitPos.y) << ", " << std::to_string(m_rayCastHitPos.z) << ")\n";
-	//	}
-	//}
+	if (m_mouseStateTracker.rightButton == m_mouseStateTracker.PRESSED)
+	{
+		Ray resultRay;
+		m_raycastHitResult = raycast(state.x, state.y, resultRay);
+		if (m_raycastHitResult.IsHit)
+		{
+			//std::cout << "Raycast hit object! Position: (" << std::to_string(m_rayCastHitPos.x) << ", " << std::to_string(m_rayCastHitPos.y) << ", " << std::to_string(m_rayCastHitPos.z) << ")\n";
+		}
+	}
 }
 
 bool ShaderLab::initDirectX()
@@ -421,7 +430,7 @@ HitResult ShaderLab::raycast(int sx, int sy, Ray& outRay)
 	//or define like this -> Vector3::Zero is view space origin and we transform it to world space with the inverse of the view matrix
 	Vector3 rayOrigin = Vector3::Transform(Vector3::Zero, invView);
 
-	Vector3 rayDir = Vector3(vx, vy, -1.0f);
+	Vector3 rayDir = Vector3(vx, vy, 1.0f);
 	//convert to world space
 	rayDir = Vector3::TransformNormal(rayDir, invView);
 	rayDir.Normalize();
