@@ -120,5 +120,7 @@ void main(point v2gConnector input[1], inout TriangleStream<g2vbConnector> outSt
             outStream.RestartStrip();
         }
     }
+    else
+        outStream.RestartStrip();
 }
 

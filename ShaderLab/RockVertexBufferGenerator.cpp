@@ -77,7 +77,9 @@ bool RockVertexBufferGenerator::Generate(ID3D11DeviceContext* deviceContext, ID3
 	deviceContext->OMSetRenderTargets(0, nullptr, nullptr);
 	deviceContext->OMSetDepthStencilState(nullptr, 0);
 
+	deviceContext->Begin(m_deviceStats);
 	deviceContext->DrawInstanced(m_densityTextureSize.x*m_densityTextureSize.z, m_densityTextureSize.y, 0, 0);
+	deviceContext->End(m_deviceStats);
 
 	/** RESET */
 	deviceContext->VSSetShader(nullptr, nullptr, 0);
@@ -219,6 +221,21 @@ bool RockVertexBufferGenerator::createVertexBuffer(ID3D11Device* device)
 	if (FAILED(hr))
 		return false;
 
+	//created staging vertex buffer for reading buffer on the cpu
+	vertexBufferDesc.BindFlags = 0;
+	vertexBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+	vertexBufferDesc.Usage = D3D11_USAGE_STAGING;
+
+	if (FAILED(hr = device->CreateBuffer(&vertexBufferDesc, NULL, &m_stagedVertexBuffer)))
+		return false;
+
+	//create devicestats for querying size of stream output
+	D3D11_QUERY_DESC queryDesc;
+	queryDesc.Query = D3D11_QUERY_PIPELINE_STATISTICS;
+	queryDesc.MiscFlags = 0;
+	if (FAILED(hr = device->CreateQuery(&queryDesc, &m_deviceStats)))
+		return false;
+
 	return true;
 }
 
@@ -274,6 +291,44 @@ int RockVertexBufferGenerator::createDummyVertices(VertexShaderInput** outVertic
 	return size;
 }
 
+std::vector<Triangle> RockVertexBufferGenerator::extractTrianglesFromVertexBuffer(ID3D11DeviceContext* pDeviceContext, const Matrix& triangleSRT) const
+{
+	//see https://www.gamedev.net/blog/272/entry-1913400-using-d3d11-stream-out-for-debugging/
+	std::vector<Triangle> triangles;
+	pDeviceContext->CopyResource(m_stagedVertexBuffer, m_vertexBuffer);
+
+	D3D11_MAPPED_SUBRESOURCE data;
+	if (SUCCEEDED(pDeviceContext->Map(m_stagedVertexBuffer, 0, D3D11_MAP_READ, 0, &data)))
+	{
+		GeometryShaderOutput *pRaw = reinterpret_cast< GeometryShaderOutput*>(data.pData);
+
+		D3D11_QUERY_DATA_PIPELINE_STATISTICS stats;
+		while (S_OK != pDeviceContext->GetData(m_deviceStats, &stats, m_deviceStats->GetDataSize(), 0));
+		
+		for (size_t i = 0; i < stats.GSPrimitives*3;)
+		{
+			bool notANumberDetected = false;
+			Vector3 vertices[3];
+			for(auto& vertex : vertices)
+			{
+				if (pRaw[i].LocalPosition.x != pRaw[i].LocalPosition.x || pRaw[i].LocalPosition.y != pRaw[i].LocalPosition.y || pRaw[i].LocalPosition.z != pRaw[i].LocalPosition.z)
+					notANumberDetected = true;
+
+				vertex = Vector3(pRaw[i].LocalPosition.x, pRaw[i].LocalPosition.y, pRaw[i].LocalPosition.z);
+				vertex = XMVector3Transform(vertex, triangleSRT);
+				++i;
+			}
+
+			if(!notANumberDetected)
+				triangles.push_back(Triangle(vertices[0], vertices[1], vertices[2]));
+		}
+
+		pDeviceContext->Unmap(m_stagedVertexBuffer, 0);
+	}
+
+	return triangles;
+}
+
 void RockVertexBufferGenerator::releaseSamplerStates()
 {
 	SafeRelease(m_samplerState);
@@ -283,6 +338,8 @@ void RockVertexBufferGenerator::releaseVertexBuffer()
 {
 	SafeRelease(m_vertexBuffer);
 	SafeRelease(m_dummyVertexBuffer);
+	SafeRelease(m_stagedVertexBuffer);
+	SafeRelease(m_deviceStats);
 	delete[] m_dummyVertices;
 }
 

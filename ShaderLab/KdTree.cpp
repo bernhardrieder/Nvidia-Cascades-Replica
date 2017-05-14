@@ -142,7 +142,7 @@ KDNode* KDNode::Build(std::vector<Triangle*>& triangles, int depth)
 
 HitResult KDNode::RayCast(KDNode* root, const DirectX::SimpleMath::Ray& ray)
 {
-	float tmin = std::numeric_limits<float>::max();
+	float tmin = (std::numeric_limits<float>::max)();
 	HitResult outHitResult;
 	KDNode::isHit(root, ray, tmin, outHitResult);
 	return outHitResult;

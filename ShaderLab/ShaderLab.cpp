@@ -1,7 +1,6 @@
 #include "stdafx.h"
 #include "ShaderLab.h"
 #include <fstream>
-#include <minwinbase.h>
 
 using namespace DirectX;
 using namespace DirectX::SimpleMath;
@@ -60,13 +59,15 @@ bool ShaderLab::Initialize()
 	m_worldMatrix = Matrix::CreateWorld(Vector3(0, 0, 0), Vector3::Forward, Vector3::Up);
 	m_worldMatrix *= Matrix::CreateScale(10, 10, 10);
 
+	m_rockKdTreeRoot = std::make_unique<KDNode>();
+	m_raycastHitSphere = DirectX::GeometricPrimitive::CreateSphere(m_deviceContext);
+
 	return true;
 }
 
 void ShaderLab::update(float deltaTime)
 {
-	checkAndProcessKeyboardInput(deltaTime);
-
+	D3D11App::update(deltaTime);
 
 	m_cbPerFrame.View = m_camera.GetView();
 	m_cbPerFrame.ViewProj = m_camera.GetView() * m_camera.GetProj();
@@ -89,16 +90,32 @@ void ShaderLab::update(float deltaTime)
 	}
 }
 
-void ShaderLab::render(float deltaTime)
+void ShaderLab::render()
 {
 	assert(m_device);
 	assert(m_deviceContext);
 
 	if (!m_isDensityTextureGenerated)
+	{
+		std::cout << "Create density 3D texture ...";
 		m_isDensityTextureGenerated = m_densityTexGenerator.Generate(m_deviceContext);
+		std::cout << " finished!\n";
+	}
 
 	if (m_isDensityTextureGenerated && !m_isRockVertexBufferGenerated)
+	{
+		std::cout << "Create rock vertexbuffer and extract triangles from vertexbuffer ...";
 		m_isRockVertexBufferGenerated = m_rockVBGenerator.Generate(m_deviceContext, m_densityTexGenerator.GetTexture3DShaderResourceView());
+		m_rockTrianglesTransformed = m_rockVBGenerator.extractTrianglesFromVertexBuffer(m_deviceContext, m_worldMatrix);
+		std::cout << " finished!\n";
+
+		std::vector<Triangle*> triPointer;
+		for (auto& triangle : m_rockTrianglesTransformed)
+			triPointer.push_back(&triangle);
+		std::cout << "Build kdTree ...";
+		m_rockKdTreeRoot.reset(KDNode::Build(triPointer, 0));
+		std::cout << " finished!\n";
+	}
 
 	m_deviceContext->ClearRenderTargetView(m_renderTargetView, DirectX::Colors::CornflowerBlue);
 	m_deviceContext->ClearDepthStencilView(m_depthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
@@ -134,12 +151,16 @@ void ShaderLab::render(float deltaTime)
 	m_deviceContext->PSSetShaderResources(7, 1, &m_texturesBumpSRVs[3]);
 	m_deviceContext->PSSetShaderResources(8, 1, &m_texturesBumpSRVs[18]);
 
-
 	m_deviceContext->OMSetRenderTargets(1, &m_renderTargetView, m_depthStencilView);
 	m_deviceContext->OMSetDepthStencilState(m_depthStencilState, 1);
 
 	m_deviceContext->DrawAuto();
 
+	//TODO: create own vertex buffer?
+	//render raycast hit
+	if (m_raycastHitResult.IsHit)
+		m_raycastHitSphere->Draw(Matrix::CreateTranslation(m_raycastHitResult.ImpactPoint), m_camera.GetView(), m_camera.GetProj());
+	
 	//Present Frame!!
 	m_swapChain->Present(0, 0);
 }
@@ -183,9 +204,9 @@ bool ShaderLab::loadShaders()
 	// Create the input layout for the vertex shader.
 	D3D11_INPUT_ELEMENT_DESC vertexLayoutDesc[] =
 	{
-		{"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(VertexPosNormal,Position), D3D11_INPUT_PER_VERTEX_DATA, 0},
-		{"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(VertexPosNormal,Normal), D3D11_INPUT_PER_VERTEX_DATA, 0},
-		{ "NORMAL", 1, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(VertexPosNormal,SurfaceNormal), D3D11_INPUT_PER_VERTEX_DATA, 0 }
+		{"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(VertexPosNormal,LocalPosition), D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(VertexPosNormal,LocalVertexNormal), D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{ "NORMAL", 1, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(VertexPosNormal,LocalSurfaceNormal), D3D11_INPUT_PER_VERTEX_DATA, 0 }
 	};
 
 	hr = m_device->CreateInputLayout(vertexLayoutDesc, _countof(vertexLayoutDesc), vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize(), &m_inputLayoutSimpleVS);
@@ -229,81 +250,50 @@ void ShaderLab::onResize()
 	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Application], 0, nullptr, &m_cbPerApplication, 0, 0);
 }
 
-void ShaderLab::onMouseDown(WPARAM btnState, int x, int y)
-{
-	D3D11App::onMouseDown(btnState, x, y);
-	m_lastMousePos.x = x;
-	m_lastMousePos.y = y;
-
-	SetCapture(m_windowHandle);
-}
-
-void ShaderLab::onMouseUp(WPARAM btnState, int x, int y)
-{
-	D3D11App::onMouseUp(btnState, x, y);
-	ReleaseCapture();
-}
-
-void ShaderLab::onMouseMove(WPARAM btnState, int x, int y)
-{
-	D3D11App::onMouseMove(btnState, x, y);
-	if ((btnState & MK_LBUTTON) != 0)
-	{
-		// Make each pixel correspond to a quarter of a degree.
-		float dx = DirectX::XMConvertToRadians(0.10f * static_cast<float>(x - m_lastMousePos.x));
-		float dy = DirectX::XMConvertToRadians(0.10f * static_cast<float>(y - m_lastMousePos.y));
-
-		m_camera.Pitch(dy);
-		m_camera.RotateY(dx);
-	}
-
-	m_lastMousePos.x = x;
-	m_lastMousePos.y = y;
-}
-
 void ShaderLab::checkAndProcessKeyboardInput(float deltaTime)
 {
+	auto state = m_keyboard->GetState();
+	if (state.Escape)
+	{
+		PostQuitMessage(0);
+	}
+
+	m_keyboardStateTracker.Update(state);
+	
+	//m_keyboardStateTracker.IsKeyPressed(Keyboard::Keys::W) --> returns true if button is pressed (the first time)
+	//state.W --> return true if button is held
 	static float cameraSpeed = 10.f;
-	if (GetAsyncKeyState('W') & 0x8000)
+	if (state.W)
 		m_camera.Walk(cameraSpeed * deltaTime);
-
-	if (GetAsyncKeyState('S') & 0x8000)
+	if (state.S)
 		m_camera.Walk(-cameraSpeed * deltaTime);
-
-	if (GetAsyncKeyState('A') & 0x8000)
+	if (state.A)
 		m_camera.Strafe(-cameraSpeed * deltaTime);
-
-	if (GetAsyncKeyState('D') & 0x8000)
+	if (state.D)
 		m_camera.Strafe(cameraSpeed * deltaTime);
-
 	m_camera.UpdateViewMatrix();
 
 	//SUN ROTATION
-	if (GetAsyncKeyState(VK_LEFT) & 0x8000)
+	m_sunPhi = MathHelper::Clamp(m_sunPhi, 0.1f, XM_PIDIV2);
+	if (state.Up)
+		m_sunPhi += 1.0f*deltaTime;
+	if (state.Down)
+		m_sunPhi -= 1.0f*deltaTime;
+	if (state.Left)
 		m_sunTheta -= 1.0f*deltaTime;
-
-	if (GetAsyncKeyState(VK_RIGHT) & 0x8000)
+	if (state.Right)
 		m_sunTheta += 1.0f*deltaTime;
 
-	if (GetAsyncKeyState(VK_UP) & 0x8000)
-		m_sunPhi += 1.0f*deltaTime;
-
-	if (GetAsyncKeyState(VK_DOWN) & 0x8000)
-		m_sunPhi -= 1.0f*deltaTime;
-
-	m_sunPhi = MathHelper::Clamp(m_sunPhi, 0.1f, XM_PIDIV2);
-
-
 	//per app (mostly parallax elements) constant buffer
-	if (GetAsyncKeyState('O') & 0x8000)
+	if (state.O)
 	{
 		m_cbPerApplication.DisplacementScale -= 0.1f * deltaTime;
 		if (m_cbPerApplication.DisplacementScale < 0.0f)
 			m_cbPerApplication.DisplacementScale = 0.f;
 	}
-	if (GetAsyncKeyState('P') & 0x8000)
+	if(state.P)
 		m_cbPerApplication.DisplacementScale += 0.1f * deltaTime;
-	if (GetAsyncKeyState('K') & 0x8000)
+	if (m_keyboardStateTracker.IsKeyPressed(Keyboard::Keys::K))
 	{
 		if (m_cbPerApplication.InitialStepIterations >= 4)
 		{
@@ -311,26 +301,46 @@ void ShaderLab::checkAndProcessKeyboardInput(float deltaTime)
 			m_cbPerApplication.RefinementStepIterations = m_cbPerApplication.InitialStepIterations / 2;
 		}
 	}
-	if (GetAsyncKeyState('L') & 0x8000)
+	if (m_keyboardStateTracker.IsKeyPressed(Keyboard::Keys::L))
 	{
 		m_cbPerApplication.InitialStepIterations += 2;
 		m_cbPerApplication.RefinementStepIterations = m_cbPerApplication.InitialStepIterations / 2;
 	}
-	if (GetAsyncKeyState('N') & 0x8000)
+	if (state.N)
 	{
 		m_cbPerApplication.ParallaxDepth -= 1.f * deltaTime;
 		if (m_cbPerApplication.ParallaxDepth < 0.0f)
 			m_cbPerApplication.ParallaxDepth = 0.f;
 	}
-	if (GetAsyncKeyState('M') & 0x8000)
+	if (state.M)
 		m_cbPerApplication.ParallaxDepth += 1.f * deltaTime;
 
-
-	if (GetAsyncKeyState('O') & 0x8000 || GetAsyncKeyState('P') & 0x8000 ||
-		GetAsyncKeyState('K') & 0x8000 || GetAsyncKeyState('L') & 0x8000 ||
-		GetAsyncKeyState('N') & 0x8000 || GetAsyncKeyState('M') & 0x8000)
+	if (state.O || state.P || state.K || state.L ||	state.N || state.M)
 		m_updateCbPerApplication = true;
+}
 
+void ShaderLab::checkAndProcessMouseInput(float deltaTime)
+{
+	auto state = m_mouse->GetState();
+	auto lastState = m_mouseStateTracker.GetLastState();
+	m_mouseStateTracker.Update(state);
+	if (m_mouseStateTracker.leftButton == m_mouseStateTracker.HELD)
+	{
+		// Make each pixel correspond to a quarter of a degree.
+		float dx = DirectX::XMConvertToRadians(0.10f*static_cast<float>(state.x - lastState.x));
+		float dy = DirectX::XMConvertToRadians(0.10f*static_cast<float>(state.y - lastState.y));
+
+		m_camera.Pitch(dy);
+		m_camera.RotateY(dx);
+		m_camera.UpdateViewMatrix();
+	}
+	if (m_mouseStateTracker.rightButton == m_mouseStateTracker.PRESSED)
+	{
+		Ray resultRay;
+		m_raycastHitResult = raycast(state.x, state.y, resultRay);
+		if (m_raycastHitResult.IsHit)
+			std::cout << "Raycast hit object! Position: (" << std::to_string(m_raycastHitResult.ImpactPoint.x) << ", " << std::to_string(m_raycastHitResult.ImpactPoint.y) << ", " << std::to_string(m_raycastHitResult.ImpactPoint.z) << ")\n";
+	}
 }
 
 bool ShaderLab::initDirectX()
@@ -409,4 +419,26 @@ bool ShaderLab::createSampler(ID3D11Device* device)
 void ShaderLab::releaseSampler()
 {
 	SafeRelease(m_lichenSampler);
+}
+
+HitResult ShaderLab::raycast(int sx, int sy, Ray& outRay)
+{	
+	// Compute picking ray in view space.
+	float vx = (((+2.0f*sx) / m_windowWidth) - 1.0f) / m_camera.GetProj()(0, 0);
+	float vy = (((-2.0f*sy) / m_windowHeight) + 1.0f) / m_camera.GetProj()(1, 1);
+
+	Matrix invView = m_camera.GetView().Invert();
+
+	// Ray definition in view space.
+	//Vector3 rayOrigin = Vector3(invView._41, invView._42, invView._43); //current eye position in world space
+	//or define like this -> Vector3::Zero is view space origin and we transform it to world space with the inverse of the view matrix
+	Vector3 rayOrigin = Vector3::Transform(Vector3::Zero, invView);
+
+	Vector3 rayDir = Vector3(vx, vy, 1.0f);
+	//convert to world space
+	rayDir = Vector3::TransformNormal(rayDir, invView);
+	rayDir.Normalize();
+
+	outRay = Ray(rayOrigin, rayDir);
+	return KDNode::RayCast(m_rockKdTreeRoot.get(), outRay);
 }

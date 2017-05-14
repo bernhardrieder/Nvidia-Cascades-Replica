@@ -5,8 +5,11 @@
 #include "RockVertexBufferGenerator.h"
 #include "Density3DTextureGenerator.h"
 #include <SimpleMath.h>
+#include "CollisionDetectionHelper.h"
+#include "KdTree.h"
 
 using namespace DirectX;
+using namespace DirectX::SimpleMath;
 
 class ShaderLab : public D3D11App
 {
@@ -20,14 +23,12 @@ public:
 
 private:	
 	void update(float deltaTime) override;
-	void render(float deltaTime) override;
+	void render() override;
 	bool loadShaders();
 	void unloadShaders();
 	void onResize() override;
-	void onMouseDown(WPARAM btnState, int x, int y) override;
-	void onMouseUp(WPARAM btnState, int x, int y) override;
-	void onMouseMove(WPARAM btnState, int x, int y) override;
-	void checkAndProcessKeyboardInput(float deltaTime);
+	void checkAndProcessKeyboardInput(float deltaTime) override;
+	void checkAndProcessMouseInput(float deltaTime) override;
 	bool initDirectX() override;
 	void cleanup() override;
 
@@ -35,6 +36,8 @@ private:
 	void releaseTextures();
 	bool createSampler(ID3D11Device* device);
 	void releaseSampler();
+
+	HitResult raycast(int sx, int sy, DirectX::SimpleMath::Ray& outRay);
 private:
 	// Shader resources
 	enum ShaderConstanBufferType
@@ -48,9 +51,9 @@ private:
 	// Vertex data for a colored cube.
 	struct VertexPosNormal
 	{
-		XMFLOAT4 Position;
-		XMFLOAT3 Normal;
-		XMFLOAT3 SurfaceNormal;
+		DirectX::XMFLOAT4 LocalPosition;
+		DirectX::XMFLOAT3 LocalVertexNormal;
+		DirectX::XMFLOAT3 LocalSurfaceNormal;
 	};
 
 	struct CbPerApplication
@@ -105,7 +108,6 @@ private:
 	ID3D11Buffer* m_constantBuffers[NumConstantBuffers];
 	std::unique_ptr<DirectX::CommonStates> m_commonStates;
 
-	POINT m_lastMousePos;
 	Camera m_camera;
 	SimpleMath::Matrix m_worldMatrix = SimpleMath::Matrix::Identity;;
 
@@ -127,4 +129,10 @@ private:
 	std::wstring m_textureBumpFilesPath = L"Assets/Textures/bump/";
 	std::wstring m_textureGenericFilename = L"lichen";
 	std::wstring m_textureFilenameExtension = L".dds";
+
+	//Raycasting
+	std::unique_ptr<KDNode> m_rockKdTreeRoot;
+	std::vector<Triangle> m_rockTrianglesTransformed;
+	HitResult m_raycastHitResult;
+	std::unique_ptr<DirectX::GeometricPrimitive> m_raycastHitSphere;
 };
