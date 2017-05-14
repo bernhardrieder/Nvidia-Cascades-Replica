@@ -40,13 +40,13 @@ cbuffer cbFixed
     };
 };
 
-// Array of textures for texturing the particles.
-Texture2DArray gTexArray;
 
 // Random texture used to generate random numbers in shaders.
-Texture1D gRandomTex;
+Texture1D gRandomTex : register(t0);
+// Array of textures for texturing the particles.
+Texture2DArray gTexArray : register(t1);
 
-SamplerState samLinear
+SamplerState samLinear : register(s0)
 {
     Filter = MIN_MAG_MIP_LINEAR;
     AddressU = WRAP;

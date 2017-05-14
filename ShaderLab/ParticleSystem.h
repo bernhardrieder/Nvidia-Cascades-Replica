@@ -15,14 +15,14 @@ public:
 	// Time elapsed since the system was reset.
 	//float GetAge()const;
 
-	void SetEyePos(const Vector3& eyePosW);
-	void SetEmitPos(const Vector3& emitPosW);
-	void SetEmitDir(const Vector3& emitDirW);
+	//void SetEyePos(const XMFLOAT4& eyePosW);
+	void SetEmitPos(const XMFLOAT4& emitPosW);
+	void SetEmitDir(const XMFLOAT4& emitDirW);
 
-	bool Init(const std::wstring& particleNamePrefixInShaderFile, ID3D11Device* device, ID3D11ShaderResourceView* texArraySRV, ID3D11ShaderResourceView* randomTexSRV, unsigned maxParticles);
+	bool Initialize(const std::wstring& particleNamePrefixInShaderFile, ID3D11Device* device, ID3D11ShaderResourceView* texArraySRV, ID3D11ShaderResourceView* randomTexSRV, unsigned maxParticles);
 
 	void Reset();
-	void Update(float dt, float gameTime);
+	void Update(ID3D11DeviceContext* deviceContext, const float& dt, const float& gameTime, const Camera& camera);
 	void Draw(ID3D11DeviceContext* dc, const Camera& cam);
 
 private:
@@ -44,20 +44,23 @@ private:
 		float Age;
 		unsigned int Type;
 	};
+	enum ConstanBufferType
+	{
+		PerFrame = 0,
+		NumConstantBuffers
+	};
 	struct CbPerFrame
 	{
+		XMMATRIX ViewProj;
+		XMFLOAT4 EyePosW;
+		XMFLOAT4 EmitPosW;
+		XMFLOAT4 EmitDirW;
+		float GameTime;
+		float DeltaTime;
 	};
-
 	unsigned mMaxParticles;
 	bool mFirstRun;
-
-	float mGameTime;
-	float mTimeStep;
 	float mAge;
-
-	Vector3 mEyePosW;
-	Vector3 mEmitPosW;
-	Vector3 mEmitDirW;
 
 	//init
 	ID3D11VertexShader* m_vsInit = nullptr;
@@ -72,6 +75,8 @@ private:
 	ID3D11Buffer* mInitVB;
 	ID3D11Buffer* mDrawVB;
 	ID3D11Buffer* mStreamOutVB;
+	ID3D11Buffer* m_constantBuffers[NumConstantBuffers];
+	CbPerFrame m_cbPerFrame;
 
 	ID3D11ShaderResourceView* mTexArraySRV;
 	ID3D11ShaderResourceView* mRandomTexSRV;

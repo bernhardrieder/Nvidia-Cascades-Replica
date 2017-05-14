@@ -5,13 +5,13 @@
 ParticleSystem::ParticleSystem()
 {
 	mFirstRun = true;
-	mGameTime = 0.0f;
-	mTimeStep = 0.0f;
+	m_cbPerFrame.GameTime = 0.0f;
+	m_cbPerFrame.DeltaTime = 0.0f;
 	mAge = 0.0f;
 
-	mEyePosW = Vector3(0.0f, 0.0f, 0.0f);
-	mEmitPosW = Vector3(0.0f, 0.0f, 0.0f);
-	mEmitDirW = Vector3(0.0f, 1.0f, 0.0f);
+	m_cbPerFrame.EyePosW = { 0.0f, 0.0f, 0.0f, 0.f };
+	m_cbPerFrame.EmitPosW = { 0.0f, 0.0f, 0.0f, 0.f };
+	m_cbPerFrame.EmitDirW = { 0.0f, 1.0f, 0.0f, 0.f };
 }
 
 ParticleSystem::~ParticleSystem()
@@ -21,19 +21,19 @@ ParticleSystem::~ParticleSystem()
 	releaseVertexBuffers();
 }
 
-void ParticleSystem::SetEyePos(const Vector3& eyePosW)
+//void ParticleSystem::SetEyePos(const XMFLOAT4& eyePosW)
+//{
+//	m_cbPerFrame.EyePosW = eyePosW;
+//}
+
+void ParticleSystem::SetEmitPos(const XMFLOAT4& emitPosW)
 {
-	mEyePosW = eyePosW;
+	m_cbPerFrame.EmitPosW = emitPosW;
 }
 
-void ParticleSystem::SetEmitPos(const Vector3& emitPosW)
+void ParticleSystem::SetEmitDir(const XMFLOAT4& emitDirW)
 {
-	mEmitPosW = emitPosW;
-}
-
-void ParticleSystem::SetEmitDir(const Vector3& emitDirW)
-{
-	mEmitDirW = emitDirW;
+	m_cbPerFrame.EmitDirW = emitDirW;
 }
 
 bool ParticleSystem::Initialize(const std::wstring& particleNamePrefixInShaderFile, ID3D11Device* device, ID3D11ShaderResourceView* texArraySRV, ID3D11ShaderResourceView* randomTexSRV, unsigned maxParticles)
@@ -68,16 +68,40 @@ void ParticleSystem::Reset()
 	mAge = 0.0f;
 }
 
-void ParticleSystem::Update(float dt, float gameTime)
+void ParticleSystem::Update(ID3D11DeviceContext* deviceContext, const float& dt, const float& gameTime, const Camera& camera)
 {
-	mGameTime = gameTime;
-	mTimeStep = dt;
+	m_cbPerFrame.GameTime = gameTime;
+	m_cbPerFrame.DeltaTime = dt;
+	m_cbPerFrame.ViewProj = camera.GetView() * camera.GetProj();
+	auto camPos = camera.GetPosition();
+	m_cbPerFrame.EyePosW = {camPos.x, camPos.y, camPos.z, 0.f};
+
+	deviceContext->UpdateSubresource(m_constantBuffers[PerFrame], 0, nullptr, &m_cbPerFrame, 0, 0);
 
 	mAge += dt;
 }
 
 void ParticleSystem::Draw(ID3D11DeviceContext* dc, const Camera& cam)
 {
+	dc->IASetInputLayout(m_vsInputLayout);
+	dc->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
+
+	UINT stride = sizeof(Particle);
+	UINT offset = 0;
+
+	// On the first pass, use the initialization VB.  Otherwise, use
+	// the VB that contains the current particle list.
+	if (mFirstRun)
+		dc->IASetVertexBuffers(0, 1, &mInitVB, &stride, &offset);
+	else
+		dc->IASetVertexBuffers(0, 1, &mDrawVB, &stride, &offset);
+
+	//
+	// Draw the current particle list using stream-out only to update them.  
+	// The updated vertices are streamed-out to the target VB. 
+	//
+	dc->SOSetTargets(1, &mStreamOutVB, &offset);
+	//todo: continue 
 }
 
 
@@ -192,14 +216,27 @@ void ParticleSystem::releaseShaders()
 	SafeRelease(m_vsInputLayout);
 }
 
-//todo
 bool ParticleSystem::createConstantBuffers(ID3D11Device* device)
 {
+	D3D11_BUFFER_DESC bufferDesc;
+	ZeroMemory(&bufferDesc, sizeof(D3D11_BUFFER_DESC));
+	bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	bufferDesc.ByteWidth = sizeof(CbPerFrame);
+	bufferDesc.CPUAccessFlags = 0;
+	bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+	bufferDesc.StructureByteStride = 0;
+	bufferDesc.MiscFlags = 0;
+	
+	if (FAILED(device->CreateBuffer(&bufferDesc, nullptr, &m_constantBuffers[PerFrame])))
+		return false;
+	
+	return true;
 }
 
-//todo
 void ParticleSystem::releaseConstantBuffers()
 {
+	for (auto& buffer : m_constantBuffers)
+		SafeRelease(buffer);
 }
 
 bool ParticleSystem::createVertexBuffers(ID3D11Device* device)
