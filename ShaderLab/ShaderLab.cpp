@@ -49,9 +49,8 @@ bool ShaderLab::Initialize()
 		return false;
 	}
 
-	auto fileName = m_textureFilesPath + L"flare0" + m_textureFilenameExtension;
-	std::vector<std::wstring> fireParticlesFilenames = { fileName };
-	if (!m_fireParticles.Initialize(L"Fire", m_device, m_deviceContext, fireParticlesFilenames, 500))
+	auto fireTextureFile = m_textureFilesPath + L"flare0" + m_textureFilenameExtension;
+	if (!m_fireParticles.Initialize(L"Fire", fireTextureFile, 500, m_device))
 	{
 		MessageBox(nullptr, TEXT("Failed to initialize fire ParticleSystem!"), TEXT("Error"), MB_OK);
 		return false;
@@ -348,7 +347,7 @@ void ShaderLab::checkAndProcessMouseInput(float deltaTime)
 		if (m_raycastHitResult.IsHit)
 		{
 			std::cout << "Raycast hit object! Position: (" << std::to_string(m_raycastHitResult.ImpactPoint.x) << ", " << std::to_string(m_raycastHitResult.ImpactPoint.y) << ", " << std::to_string(m_raycastHitResult.ImpactPoint.z) << ")\n";
-			m_fireParticles.SetEmitPos(m_raycastHitResult.ImpactPoint);
+			m_fireParticles.SetEmitterPosition(m_raycastHitResult.ImpactPoint);
 		}
 	
 	}

@@ -4,15 +4,13 @@
 
 ParticleSystem::ParticleSystem()
 {
-	mFirstRun = true;
+	m_isEmitterAlive = false;
 	m_cbPerFrame.GameTime = 0.0f;
 	m_cbPerFrame.DeltaTime = 0.0f;
-	mAge = 0.0f;
 
-	m_cbPerFrame.EyePosW = {0.0f, 0.0f, 0.0f, 0.f};
-	m_cbPerFrame.EmitPosW = {0.0f, 0.0f, 0.0f, 0.f};
-	m_cbPerFrame.EmitDirW = {0.0f, 1.0f, 0.0f, 0.f};
-
+	m_cbPerFrame.EyePositionWorld = {0.0f, 0.0f, 0.0f, 0.f};
+	m_cbPerFrame.EmitterPositionWorld = {0.0f, 0.0f, 0.0f, 0.f};
+	m_cbPerFrame.EmitterDirectionWorld = {0.0f, 1.0f, 0.0f, 0.f};
 }
 
 ParticleSystem::~ParticleSystem()
@@ -20,25 +18,24 @@ ParticleSystem::~ParticleSystem()
 	releaseShaders();
 	releaseConstantBuffers();
 	releaseVertexBuffers();
-	releaseRandomTexture(); 
-	releaseTextureArray();
+	releaseTextureSRVs(); 
 }
 
-void ParticleSystem::SetEmitPos(const XMFLOAT3& emitPosW)
+void ParticleSystem::SetEmitterPosition(const XMFLOAT3& emitterPositionWorld)
 {
-	m_cbPerFrame.EmitPosW = { emitPosW.x, emitPosW.y, emitPosW.z, 0.f };
-	m_emitPosSet = true;
+	m_cbPerFrame.EmitterPositionWorld = { emitterPositionWorld.x, emitterPositionWorld.y, emitterPositionWorld.z, 0.f };
+	m_isEmitterPositionSet = true;
 }
 
-void ParticleSystem::SetEmitDir(const XMFLOAT3& emitDirW)
+void ParticleSystem::SetEmitterDirection(const XMFLOAT3& emitterDirectionNormalized)
 {
-	m_cbPerFrame.EmitDirW = { emitDirW.x, emitDirW.y, emitDirW.z, 0.f };
+	m_cbPerFrame.EmitterDirectionWorld = { emitterDirectionNormalized.x, emitterDirectionNormalized.y, emitterDirectionNormalized.z, 0.f };
 }
-
-bool ParticleSystem::Initialize(const std::wstring& particleNamePrefixInShaderFile, ID3D11Device* device, ID3D11DeviceContext* context, const std::vector<std::wstring>& filenamesOfUniformTextures, unsigned maxParticles)
+ 
+bool ParticleSystem::Initialize(const std::wstring& particleNamePrefixInShaderFile, const std::wstring& textureFile, const unsigned& maxParticles, ID3D11Device* device)
 {
 	m_shaderFilePrefix = particleNamePrefixInShaderFile;
-	mMaxParticles = maxParticles;
+	m_maxParticles = maxParticles;
 
 	if (!loadShaders(device))
 	{
@@ -55,137 +52,128 @@ bool ParticleSystem::Initialize(const std::wstring& particleNamePrefixInShaderFi
 		MessageBox(nullptr, TEXT("ParticleSystem: Failed to load buffers!"), TEXT("Error"), MB_OK);
 		return false;
 	}
-	if (!createRandomTexture(device))
+	if (!createRandomTextureSRV(device))
 	{
 		MessageBox(nullptr, TEXT("ParticleSystem: Failed to create random texture!"), TEXT("Error"), MB_OK);
 		return false;
 	}
-	if(!createTextureArray(device, context, filenamesOfUniformTextures))
+	if(!createTextureSRV(device, textureFile))
 	{
-		MessageBox(nullptr, TEXT("ParticleSystem: Failed to create texture array!"), TEXT("Error"), MB_OK);
+		MessageBox(nullptr, TEXT("ParticleSystem: Failed to create texture!"), TEXT("Error"), MB_OK);
 		return false;
 	}
-
+	
 	m_commonStates = std::make_unique<CommonStates>(device);
-	m_samplerLinearWrap = m_commonStates->LinearWrap();
+	m_samplerLinearWrap = m_commonStates->LinearWrap();	
+	m_depthStencilRead = m_commonStates->DepthRead();
+	m_blendAdd = m_commonStates->Additive();
 	return true;
 }
 
 void ParticleSystem::Reset()
 {
-	m_emitPosSet = false;
-	mFirstRun = true;
-	mAge = 0.0f;
+	m_isEmitterPositionSet = false;
+	m_isEmitterAlive = false;
 }
 
-void ParticleSystem::Update(ID3D11DeviceContext* deviceContext, const float& dt, const float& gameTime, const Camera& camera)
+void ParticleSystem::Update(ID3D11DeviceContext* deviceContext, const float& deltaTime, const float& gameTime, const Camera& camera)
 {
+	//update constant buffer
 	m_cbPerFrame.GameTime = gameTime;
-	m_cbPerFrame.DeltaTime = dt;
+	m_cbPerFrame.DeltaTime = deltaTime;
 	m_cbPerFrame.ViewProj = camera.GetView() * camera.GetProj();
 	auto camPos = camera.GetPosition();
-	m_cbPerFrame.EyePosW = {camPos.x, camPos.y, camPos.z, 0.f};
+	m_cbPerFrame.EyePositionWorld = {camPos.x, camPos.y, camPos.z, 0.f};
 
-	deviceContext->UpdateSubresource(m_constantBuffers[PerFrame], 0, nullptr, &m_cbPerFrame, 0, 0);
-
-	mAge += dt;
+	deviceContext->UpdateSubresource(m_constantBuffers[CB_PerFrame], 0, nullptr, &m_cbPerFrame, 0, 0);
 }
 
-void ParticleSystem::Draw(ID3D11DeviceContext* dc, ID3D11RenderTargetView* renderTarget, ID3D11DepthStencilView* depthStencilView, ID3D11RasterizerState* pRasterizerState, const D3D11_VIEWPORT* pViewports, const size_t& numOfViewports)
+void ParticleSystem::Draw(ID3D11DeviceContext* deviceContext, ID3D11RenderTargetView* renderTarget, ID3D11DepthStencilView* depthStencilView, ID3D11RasterizerState* rasterizerState, const D3D11_VIEWPORT* viewports, const size_t& numOfViewports)
 {
-	if (!m_emitPosSet)
+	if (!m_isEmitterPositionSet)
 		return;
 
-	dc->IASetInputLayout(m_vsInputLayout);
-	dc->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
+	deviceContext->IASetInputLayout(m_vsInputLayout);
+	deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
 
-	drawPassEmitter(dc);
-
-	// ping-pong the vertex buffers
-	std::swap(mDrawVB, mStreamOutVB);
-
-	drawPassDraw(dc, renderTarget, depthStencilView, pRasterizerState, pViewports, numOfViewports);
+	drawPassEmitter(deviceContext);
+	drawPassDraw(deviceContext, renderTarget, depthStencilView, rasterizerState, viewports, numOfViewports);
 }
 
-void ParticleSystem::drawPassEmitter(ID3D11DeviceContext* dc)
+void ParticleSystem::drawPassEmitter(ID3D11DeviceContext* deviceContext)
 {
-	const UINT stride = sizeof(Particle);
+	const UINT stride = sizeof(ParticleShaderInput);
 	const UINT offset = 0;
 
-	// On the first pass, use the initialization VB.  Otherwise, use
-	// the VB that contains the current particle list.
-	if (mFirstRun)
-		dc->IASetVertexBuffers(0, 1, &mInitVB, &stride, &offset);
+	if (!m_isEmitterAlive)
+		deviceContext->IASetVertexBuffers(0, 1, &m_emitterCreationVB, &stride, &offset);
 	else
-		dc->IASetVertexBuffers(0, 1, &mDrawVB, &stride, &offset);
+		deviceContext->IASetVertexBuffers(0, 1, &m_emittedParticlesVB, &stride, &offset);
 
-	dc->VSSetShader(m_vsInit, nullptr, 0);
+	deviceContext->VSSetShader(m_vsEmit, nullptr, 0);
 
-	dc->GSSetShader(m_gsInit, nullptr, 0);
-	dc->GSSetConstantBuffers(0, 1, &m_constantBuffers[PerFrame]);
-	dc->GSSetShaderResources(0, 1, &mRandomTexSRV);
-	dc->GSSetSamplers(0, 1, &m_samplerLinearWrap);
+	deviceContext->GSSetShader(m_gsEmit, nullptr, 0);
+	deviceContext->GSSetConstantBuffers(0, 1, &m_constantBuffers[CB_PerFrame]);
+	deviceContext->GSSetShaderResources(0, 1, &m_randomTextureSRV);
+	deviceContext->GSSetSamplers(0, 1, &m_samplerLinearWrap);
 
-	// Draw the current particle list using stream-out only to update them.  
-	// The updated vertices are streamed-out to the target VB. 
-	dc->SOSetTargets(1, &mStreamOutVB, &offset);
+	//stream out updated emitted particles and swap with actual VB afterwards
+	deviceContext->SOSetTargets(1, &m_emitterStreamOutVB, &offset);
 
 	//disable the rest for the emitter pass
-	dc->RSSetState(nullptr);
-	dc->RSSetViewports(0, nullptr);
-	dc->PSSetShader(nullptr, nullptr, 0);
-	dc->OMSetRenderTargets(0, nullptr, nullptr);
-	dc->OMSetDepthStencilState(nullptr, 0);
+	deviceContext->RSSetState(nullptr);
+	deviceContext->RSSetViewports(0, nullptr);
+	deviceContext->PSSetShader(nullptr, nullptr, 0);
+	deviceContext->OMSetRenderTargets(0, nullptr, nullptr);
+	deviceContext->OMSetDepthStencilState(nullptr, 0);
 
 
-	if (mFirstRun)
+	if (!m_isEmitterAlive)
 	{
-		dc->Draw(1, 0);
-		mFirstRun = false;
+		deviceContext->Draw(1, 0);
+		m_isEmitterAlive = true;
 	}
 	else
 	{
-		dc->DrawAuto();
+		deviceContext->DrawAuto();
 	}
 
-	// done SO --> unbind VB
-	dc->SOSetTargets(0, nullptr, nullptr);
+	// unbind VB
+	deviceContext->SOSetTargets(0, nullptr, nullptr);
+
+	//now swap the before emitted particles for the actual draw call
+	std::swap(m_emittedParticlesVB, m_emitterStreamOutVB);
 }
 
-void ParticleSystem::drawPassDraw(ID3D11DeviceContext* dc, ID3D11RenderTargetView* renderTarget, ID3D11DepthStencilView* depthStencilView, ID3D11RasterizerState* pRasterizerState, const D3D11_VIEWPORT* pViewports, const size_t& numOfViewports)
-{	//draw pass
-
-	const UINT stride = sizeof(Particle);
+void ParticleSystem::drawPassDraw(ID3D11DeviceContext* deviceContext, ID3D11RenderTargetView* renderTarget, ID3D11DepthStencilView* depthStencilView, ID3D11RasterizerState* rasterizerState, const D3D11_VIEWPORT* viewports, const size_t& numOfViewports) const
+{	
+	const UINT stride = sizeof(ParticleShaderInput);
 	const UINT offset = 0;
 
-	// Draw the updated particle system we just streamed-out. 
-	dc->IASetVertexBuffers(0, 1, &mDrawVB, &stride, &offset);
+	deviceContext->IASetVertexBuffers(0, 1, &m_emittedParticlesVB, &stride, &offset);
 
-	dc->VSSetShader(m_vsDraw, nullptr, 0);
-	dc->VSSetConstantBuffers(0, 1, &m_constantBuffers[PerFrame]);
+	deviceContext->VSSetShader(m_vsDraw, nullptr, 0);
+	deviceContext->VSSetConstantBuffers(0, 1, &m_constantBuffers[CB_PerFrame]);
 
-	dc->GSSetShader(m_gsDraw, nullptr, 0);
-	dc->GSSetConstantBuffers(0, 1, &m_constantBuffers[PerFrame]);
+	deviceContext->GSSetShader(m_gsDraw, nullptr, 0);
+	deviceContext->GSSetConstantBuffers(0, 1, &m_constantBuffers[CB_PerFrame]);
 
-	dc->RSSetState(pRasterizerState);
-	dc->RSSetViewports(numOfViewports, pViewports);
+	deviceContext->RSSetState(rasterizerState);
+	deviceContext->RSSetViewports(numOfViewports, viewports);
 
-	dc->PSSetShader(m_psDraw, nullptr, 0);
-	dc->PSSetShaderResources(1, 1, &m_TexSRV);
-	dc->PSSetSamplers(0, 1, &m_samplerLinearWrap);
+	deviceContext->PSSetShader(m_psDraw, nullptr, 0);
+	deviceContext->PSSetShaderResources(1, 1, &m_textureSRV);
+	deviceContext->PSSetSamplers(0, 1, &m_samplerLinearWrap);
 
-	auto depthRead = m_commonStates->DepthRead();
-	dc->OMSetRenderTargets(1, &renderTarget, depthStencilView);
-	dc->OMSetDepthStencilState(depthRead, 1);
+	deviceContext->OMSetRenderTargets(1, &renderTarget, depthStencilView);
+	deviceContext->OMSetDepthStencilState(m_depthStencilRead, 1);
+	const FLOAT blendFactor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+	deviceContext->OMSetBlendState(m_blendAdd, blendFactor, 0xffffffff);
 
-	auto blendAdd = m_commonStates->Additive();
-	FLOAT blendFactor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-	dc->OMSetBlendState(blendAdd, blendFactor, 0xffffffff);
-
-	dc->DrawAuto();
+	deviceContext->DrawAuto();
 
 	//reset blendstate
-	dc->OMSetBlendState(nullptr, {}, 0xffffffff);
+	deviceContext->OMSetBlendState(nullptr, {}, 0xffffffff);
 }
 
 
@@ -211,7 +199,7 @@ bool ParticleSystem::loadInitShaders(ID3D11Device* device)
 	if (FAILED(HR_VS) || FAILED(HR_GS))
 		return false;
 
-	HR_VS = device->CreateVertexShader(vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), nullptr, &m_vsInit);
+	HR_VS = device->CreateVertexShader(vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), nullptr, &m_vsEmit);
 
 	D3D11_SO_DECLARATION_ENTRY pDecl[] =
 	{
@@ -223,7 +211,7 @@ bool ParticleSystem::loadInitShaders(ID3D11Device* device)
 		{0, "TYPE", 0, 0, 1, 0}
 	};
 
-	HR_GS = device->CreateGeometryShaderWithStreamOutput(gsBlob->GetBufferPointer(), gsBlob->GetBufferSize(), pDecl, _countof(pDecl), NULL, 0, D3D11_SO_NO_RASTERIZED_STREAM, NULL, &m_gsInit);
+	HR_GS = device->CreateGeometryShaderWithStreamOutput(gsBlob->GetBufferPointer(), gsBlob->GetBufferSize(), pDecl, _countof(pDecl), NULL, 0, D3D11_SO_NO_RASTERIZED_STREAM, NULL, &m_gsEmit);
 
 	if (FAILED(HR_VS) || FAILED(HR_GS))
 		return false;
@@ -280,24 +268,14 @@ D3D11_INPUT_ELEMENT_DESC* ParticleSystem::getParticleInputLayoutDesc(size_t& out
 {
 	static D3D11_INPUT_ELEMENT_DESC layoutDesc[] =
 	{
-		{"SV_POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(Particle,InitialPos), D3D11_INPUT_PER_VERTEX_DATA, 0},
-		{"VELOCITY", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(Particle,InitialVel), D3D11_INPUT_PER_VERTEX_DATA, 0},
-		{"SIZE", 0, DXGI_FORMAT_R32G32_FLOAT, 0, offsetof(Particle,Size), D3D11_INPUT_PER_VERTEX_DATA, 0},
-		{"AGE", 0, DXGI_FORMAT_R32_FLOAT, 0, offsetof(Particle,Age), D3D11_INPUT_PER_VERTEX_DATA, 0},
-		{"TYPE", 0, DXGI_FORMAT_R32_UINT, 0, offsetof(Particle,Type), D3D11_INPUT_PER_VERTEX_DATA, 0}
+		{"SV_POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(ParticleShaderInput,InitialPos), D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"VELOCITY", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(ParticleShaderInput,InitialVel), D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"SIZE", 0, DXGI_FORMAT_R32G32_FLOAT, 0, offsetof(ParticleShaderInput,Size), D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"AGE", 0, DXGI_FORMAT_R32_FLOAT, 0, offsetof(ParticleShaderInput,LifeTime), D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"TYPE", 0, DXGI_FORMAT_R32_UINT, 0, offsetof(ParticleShaderInput,Type), D3D11_INPUT_PER_VERTEX_DATA, 0}
 	};
 	outCountOfElements = _countof(layoutDesc);
 	return layoutDesc;
-}
-
-void ParticleSystem::releaseShaders()
-{
-	SafeRelease(m_vsInit);
-	SafeRelease(m_gsInit);
-	SafeRelease(m_vsDraw);
-	SafeRelease(m_gsDraw);
-	SafeRelease(m_psDraw);
-	SafeRelease(m_vsInputLayout);
 }
 
 bool ParticleSystem::createConstantBuffers(ID3D11Device* device)
@@ -311,72 +289,53 @@ bool ParticleSystem::createConstantBuffers(ID3D11Device* device)
 	bufferDesc.StructureByteStride = 0;
 	bufferDesc.MiscFlags = 0;
 
-	if (FAILED(device->CreateBuffer(&bufferDesc, nullptr, &m_constantBuffers[PerFrame])))
+	HRESULT hr;
+	if (FAILED(hr = device->CreateBuffer(&bufferDesc, nullptr, &m_constantBuffers[CB_PerFrame])))
 		return false;
 
 	return true;
 }
 
-void ParticleSystem::releaseConstantBuffers()
-{
-	for (auto& buffer : m_constantBuffers)
-		SafeRelease(buffer);
-}
-
 bool ParticleSystem::createVertexBuffers(ID3D11Device* device)
 {
-	//
-	// Create the buffer to kick-off the particle system.
-	//
-
 	D3D11_BUFFER_DESC vertexBufferDesc;
 	ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
 	vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-	vertexBufferDesc.ByteWidth = sizeof(Particle) * 1;
+	vertexBufferDesc.ByteWidth = sizeof(ParticleShaderInput) * 1;
 	vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 	vertexBufferDesc.CPUAccessFlags = 0;
 	vertexBufferDesc.MiscFlags = 0;
 	vertexBufferDesc.StructureByteStride = 0;
 
-	// The initial particle emitter has type 0 and age 0.  The rest
-	// of the particle attributes do not apply to an emitter.
-	Particle p;
-	ZeroMemory(&p, sizeof(Particle));
-	p.Age = 0.0f;
+	// the initial particle emitter has type 0 (emitter) and lifetime 0 - lifetime will be used for emitting
+	// the rest of the particle attributes do not apply to an emitter
+	ParticleShaderInput p;
+	ZeroMemory(&p, sizeof(ParticleShaderInput));
+	p.LifeTime = 0.0f;
 	p.Type = 0;
 
 	D3D11_SUBRESOURCE_DATA initData;
 	initData.pSysMem = &p;
 
-	if (FAILED(device->CreateBuffer(&vertexBufferDesc, &initData, &mInitVB)))
+	HRESULT hr;
+	if (FAILED(hr = device->CreateBuffer(&vertexBufferDesc, &initData, &m_emitterCreationVB)))
 		return false;
 
-	//
-	// Create the ping-pong buffers for stream-out and drawing.
-	//
-	vertexBufferDesc.ByteWidth = sizeof(Particle) * mMaxParticles;
+	// double buffering for emitted particles stream-out and drawing
+	vertexBufferDesc.ByteWidth = sizeof(ParticleShaderInput) * m_maxParticles;
 	vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER | D3D11_BIND_STREAM_OUTPUT;
 
-	if (FAILED(device->CreateBuffer(&vertexBufferDesc, NULL, &mDrawVB)))
+	if (FAILED(hr = device->CreateBuffer(&vertexBufferDesc, NULL, &m_emittedParticlesVB)))
 		return false;
-	if (FAILED(device->CreateBuffer(&vertexBufferDesc, NULL, &mStreamOutVB)))
+	if (FAILED(hr = device->CreateBuffer(&vertexBufferDesc, NULL, &m_emitterStreamOutVB)))
 		return false;
 
 	return true;
 }
 
-void ParticleSystem::releaseVertexBuffers()
+bool ParticleSystem::createRandomTextureSRV(ID3D11Device* device)
 {
-	SafeRelease(mInitVB);
-	SafeRelease(mDrawVB);
-	SafeRelease(mStreamOutVB);
-}
-
-bool ParticleSystem::createRandomTexture(ID3D11Device* device)
-{
-	//code from frank luna book - but its dx11 code in general
 	XMFLOAT4 randomValues[1024];
-
 	for (int i = 0; i < 1024; ++i)
 	{
 		randomValues[i].x = MathHelper::RandF(-1.0f, 1.0f);
@@ -390,7 +349,6 @@ bool ParticleSystem::createRandomTexture(ID3D11Device* device)
 	initData.SysMemPitch = 1024 * sizeof(XMFLOAT4);
 	initData.SysMemSlicePitch = 0;
 
-	// Create the texture.
 	D3D11_TEXTURE1D_DESC texDesc;
 	texDesc.Width = 1024;
 	texDesc.MipLevels = 1;
@@ -401,18 +359,18 @@ bool ParticleSystem::createRandomTexture(ID3D11Device* device)
 	texDesc.MiscFlags = 0;
 	texDesc.ArraySize = 1;
 
-	ID3D11Texture1D* randomTex = 0;
-	if (FAILED(device->CreateTexture1D(&texDesc, &initData, &randomTex)))
+	HRESULT hr;
+	ID3D11Texture1D* randomTex = nullptr;
+	if (FAILED(hr = device->CreateTexture1D(&texDesc, &initData, &randomTex)))
 		return false;
 
-	// Create the resource view.
 	D3D11_SHADER_RESOURCE_VIEW_DESC viewDesc;
 	viewDesc.Format = texDesc.Format;
 	viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE1D;
 	viewDesc.Texture1D.MipLevels = texDesc.MipLevels;
 	viewDesc.Texture1D.MostDetailedMip = 0;
 
-	if (FAILED(device->CreateShaderResourceView(randomTex, &viewDesc, &mRandomTexSRV)))
+	if (FAILED(hr = device->CreateShaderResourceView(randomTex, &viewDesc, &m_randomTextureSRV)))
 		return false;
 
 	SafeRelease(randomTex);
@@ -420,92 +378,40 @@ bool ParticleSystem::createRandomTexture(ID3D11Device* device)
 	return true;
 }
 
-void ParticleSystem::releaseRandomTexture()
-{
-	SafeRelease(mRandomTexSRV);
-}
-
-bool ParticleSystem::createTextureArray(ID3D11Device* device, ID3D11DeviceContext* context, const std::vector<std::wstring>& filenames)
+bool ParticleSystem::createTextureSRV(ID3D11Device* device, const std::wstring& filename)
 {
 	HRESULT hr;
-	UINT size = filenames.size();
-
-	std::vector<ID3D11Texture2D*> srcTex(size);
-	for (size_t i = 0; i < size; ++i)
-		if (FAILED(hr = DirectX::CreateDDSTextureFromFile(device, filenames[i].c_str(), reinterpret_cast<ID3D11Resource**>(&srcTex[i]), &m_TexSRV)))
-			return false;
+	if (FAILED(hr = DirectX::CreateDDSTextureFromFile(device, filename.c_str(), nullptr, &m_textureSRV)))
+		return false;
 	
-	
-	//
-	// Create the texture array.  Each element in the texture 
-	// array has the same format/dimensions.
-	//
-
-	//D3D11_TEXTURE2D_DESC texElementDesc;
-	//srcTex[0]->GetDesc(&texElementDesc);
-
-	//D3D11_TEXTURE2D_DESC texArrayDesc;
-	//texArrayDesc.Width = texElementDesc.Width;
-	//texArrayDesc.Height = texElementDesc.Height;
-	//texArrayDesc.MipLevels = texElementDesc.MipLevels;
-	//texArrayDesc.ArraySize = size;
-	//texArrayDesc.Format = texElementDesc.Format;
-	//texArrayDesc.SampleDesc.Count = 1;
-	//texArrayDesc.SampleDesc.Quality = 0;
-	//texArrayDesc.Usage = D3D11_USAGE_DEFAULT;
-	//texArrayDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-	//texArrayDesc.CPUAccessFlags = 0;
-	//texArrayDesc.MiscFlags = 0;
-
-
-	//ID3D11Texture2D* texArray = 0;
-	//if (FAILED(hr = device->CreateTexture2D(&texArrayDesc, NULL, &texArray)))
-	//	return false;
-
-	////
-	//// Copy individual texture elements into texture array.
-	////
-
-	//// for each texture element...
-	//for (UINT texElement = 0; texElement < size; ++texElement)
-	//{
-	//	// for each mipmap level...
-	//	for (UINT mipLevel = 0; mipLevel < texElementDesc.MipLevels; ++mipLevel)
-	//	{
-	//		D3D11_MAPPED_SUBRESOURCE mappedTex2D;
-	//		if (FAILED(hr = context->Map(srcTex[texElement], mipLevel, D3D11_MAP_READ, 0, &mappedTex2D)))
-	//			return false;
-
-	//		context->UpdateSubresource(texArray,
-	//			D3D11CalcSubresource(mipLevel, texElement, texElementDesc.MipLevels),
-	//			0, mappedTex2D.pData, mappedTex2D.RowPitch, mappedTex2D.DepthPitch);
-
-	//		context->Unmap(srcTex[texElement], mipLevel);
-	//	}
-	//}
-
-	//// Create a resource view to the texture array.
-	//D3D11_SHADER_RESOURCE_VIEW_DESC viewDesc;
-	//viewDesc.Format = texArrayDesc.Format;
-	//viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
-	//viewDesc.Texture2DArray.MostDetailedMip = 0;
-	//viewDesc.Texture2DArray.MipLevels = texArrayDesc.MipLevels;
-	//viewDesc.Texture2DArray.FirstArraySlice = 0;
-	//viewDesc.Texture2DArray.ArraySize = size;
-
-	//if (FAILED(hr = device->CreateShaderResourceView(texArray, &viewDesc, &mTexArraySRV)))
-	//	return false;
-
-	//// Cleanup
-	//SafeRelease(texArray);
-	//for (UINT i = 0; i < size; ++i)
-	//	SafeRelease(srcTex[i]);
-
 	return true;
 }
 
-void ParticleSystem::releaseTextureArray()
+void ParticleSystem::releaseShaders()
 {
-	//SafeRelease(mTexArraySRV);
-	SafeRelease(m_TexSRV);
+	SafeRelease(m_vsEmit);
+	SafeRelease(m_gsEmit);
+	SafeRelease(m_vsDraw);
+	SafeRelease(m_gsDraw);
+	SafeRelease(m_psDraw);
+	SafeRelease(m_vsInputLayout);
+}
+
+void ParticleSystem::releaseConstantBuffers()
+{
+	for (auto& buffer : m_constantBuffers)
+		SafeRelease(buffer);
+}
+
+void ParticleSystem::releaseVertexBuffers()
+{
+	SafeRelease(m_emitterCreationVB);
+	SafeRelease(m_emitterStreamOutVB);
+	SafeRelease(m_emittedParticlesVB);
+}
+
+void ParticleSystem::releaseTextureSRVs()
+{
+	SafeRelease(m_randomTextureSRV);
+	SafeRelease(m_textureSRV);
 }

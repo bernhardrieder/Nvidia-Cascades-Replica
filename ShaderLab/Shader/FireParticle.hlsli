@@ -21,21 +21,18 @@ cbuffer cbPerFrame : register(b0)
     float gDeltaTime;
 }
 
-//cbuffer cbFixed : register(b1)
-//{
-	// Net constant acceleration used to accerlate the particles.
-    static float3 gAccelW = { 0.0f, 7.8f, 0.0f };
+// Net constant acceleration used to accerlate the particles.
+static float3 gAccelW = { 0.0f, 7.8f, 0.0f };
 	
-	// Texture coordinates used to stretch texture over quad 
-	// when we expand point particle into a quad.
-    static float2 gQuadTexC[4] =
-    {
-        float2(0.0f, 1.0f),
-		float2(1.0f, 1.0f),
-		float2(0.0f, 0.0f),
-		float2(1.0f, 0.0f)
-    };
-//};
+// Texture coordinates used to stretch texture over quad 
+// when we expand point particle into a quad.
+static float2 gQuadTexC[4] =
+{
+    float2(0.0f, 1.0f),
+    float2(1.0f, 1.0f),
+	float2(0.0f, 0.0f),
+	float2(1.0f, 0.0f)
+};
 
 
 // Random texture used to generate random numbers in shaders.

@@ -9,71 +9,69 @@ class ParticleSystem
 public:
 	ParticleSystem();
 	~ParticleSystem();
+	ParticleSystem(const ParticleSystem& other) = delete;
 	ParticleSystem(const ParticleSystem&& move) = delete;
-	ParticleSystem(const ParticleSystem& rhs) = delete;
-	ParticleSystem& operator=(const ParticleSystem& rhs) = delete;
+	ParticleSystem& operator=(const ParticleSystem& other) = delete;
+	ParticleSystem& operator=(const ParticleSystem&& move) = delete;
 
-	// Time elapsed since the system was reset.
-	//float GetAge()const;
+	void SetEmitterPosition(const XMFLOAT3& emitterPositionWorld);
+	void SetEmitterDirection(const XMFLOAT3& emitterDirectionNormalized);
 
-	//void SetEyePos(const XMFLOAT4& eyePosW);
-	void SetEmitPos(const XMFLOAT3& emitPosW);
-	void SetEmitDir(const XMFLOAT3& emitDirW);
-
-	bool Initialize(const std::wstring& particleNamePrefixInShaderFile, ID3D11Device* device, ID3D11DeviceContext* context, const std::vector<std::wstring>& filenamesOfUniformTextures, unsigned maxParticles);
-
+	bool Initialize(const std::wstring& particleNamePrefixInShaderFile, const std::wstring& textureFile, const unsigned& maxParticles, ID3D11Device* pDevice);
+	void Update(ID3D11DeviceContext* pDeviceContext, const float& deltaTime, const float& gameTime, const Camera& camera);
+	void Draw(ID3D11DeviceContext* pDeviceContext, ID3D11RenderTargetView* pRenderTarget, ID3D11DepthStencilView* pDepthStencilView, ID3D11RasterizerState* pRasterizerState, const D3D11_VIEWPORT* viewports, const size_t& numOfViewports);
+	
 	void Reset();
-	void Update(ID3D11DeviceContext* deviceContext, const float& dt, const float& gameTime, const Camera& camera);
-	void Draw(ID3D11DeviceContext* dc, ID3D11RenderTargetView* renderTarget, ID3D11DepthStencilView* depthStencilView, ID3D11RasterizerState* pRasterizerState, const D3D11_VIEWPORT* pViewports, const size_t& numOfViewports);
+private:
+	void drawPassEmitter(ID3D11DeviceContext* pDeviceContext);
+	void drawPassDraw(ID3D11DeviceContext* pDeviceContext, ID3D11RenderTargetView* pRenderTarget, ID3D11DepthStencilView* pDepthStencilView, ID3D11RasterizerState* pRasterizerState, const D3D11_VIEWPORT* pViewports, const size_t& numOfViewports) const;
+
+	bool loadShaders(ID3D11Device* pDevice);
+	bool loadInitShaders(ID3D11Device* pDevice);
+	bool loadDrawShaders(ID3D11Device* pDevice);
+	bool createConstantBuffers(ID3D11Device* pDevice);
+	bool createVertexBuffers(ID3D11Device* pDevice);
+	bool createRandomTextureSRV(ID3D11Device* pDevice);
+	bool createTextureSRV(ID3D11Device* pDevice, const std::wstring& filename);
+
+	void releaseShaders();
+	void releaseConstantBuffers();
+	void releaseVertexBuffers();
+	void releaseTextureSRVs();
+
+	static D3D11_INPUT_ELEMENT_DESC* getParticleInputLayoutDesc(size_t& outCountOfElements);
 
 private:
-	void drawPassEmitter(ID3D11DeviceContext* dc);
-	void drawPassDraw(ID3D11DeviceContext* dc, ID3D11RenderTargetView* renderTarget, ID3D11DepthStencilView* depthStencilView, ID3D11RasterizerState* pRasterizerState, const D3D11_VIEWPORT* pViewports, const size_t& numOfViewports);
-
-	bool loadShaders(ID3D11Device* device);
-	bool loadInitShaders(ID3D11Device* device);
-	bool loadDrawShaders(ID3D11Device* device);
-	static D3D11_INPUT_ELEMENT_DESC* getParticleInputLayoutDesc(size_t& outCountOfElements);
-	void releaseShaders();
-	bool createConstantBuffers(ID3D11Device* device);
-	void releaseConstantBuffers();
-	bool createVertexBuffers(ID3D11Device* device);
-	void releaseVertexBuffers();
-	bool createRandomTexture(ID3D11Device* device);
-	void releaseRandomTexture();
-	bool createTextureArray(ID3D11Device* device, ID3D11DeviceContext* context, const std::vector<std::wstring>& filenames);
-	void releaseTextureArray();
-
-	struct Particle
+	struct ParticleShaderInput
 	{
 		XMFLOAT4 InitialPos;
 		XMFLOAT4 InitialVel;
 		XMFLOAT2 Size;
-		float Age;
+		float LifeTime;
 		unsigned int Type;
 	};
 	enum ConstanBufferType
 	{
-		PerFrame = 0,
+		CB_PerFrame = 0,
 		NumConstantBuffers
 	};
 	struct CbPerFrame
 	{
 		XMMATRIX ViewProj;
-		XMFLOAT4 EyePosW;
-		XMFLOAT4 EmitPosW;
-		XMFLOAT4 EmitDirW;
+		XMFLOAT4 EyePositionWorld;
+		XMFLOAT4 EmitterPositionWorld;
+		XMFLOAT4 EmitterDirectionWorld;
 		float GameTime;
 		float DeltaTime;
 	};
-	unsigned mMaxParticles;
-	bool mFirstRun;
-	float mAge;
-	bool m_emitPosSet = false;
+
+	unsigned m_maxParticles = 0;
+	bool m_isEmitterAlive = false;
+	bool m_isEmitterPositionSet = false;
 
 	//emitter
-	ID3D11VertexShader* m_vsInit = nullptr;
-	ID3D11GeometryShader* m_gsInit = nullptr;
+	ID3D11VertexShader* m_vsEmit = nullptr;
+	ID3D11GeometryShader* m_gsEmit = nullptr;
 	//draw
 	ID3D11VertexShader* m_vsDraw = nullptr;
 	ID3D11GeometryShader* m_gsDraw = nullptr;
@@ -82,17 +80,19 @@ private:
 	ID3D11InputLayout* m_vsInputLayout = nullptr;
 
 	ID3D11SamplerState* m_samplerLinearWrap = nullptr;
+	ID3D11DepthStencilState* m_depthStencilRead = nullptr;
+	ID3D11BlendState* m_blendAdd = nullptr;
 
-	ID3D11Buffer* mInitVB;
-	ID3D11Buffer* mDrawVB;
-	ID3D11Buffer* mStreamOutVB;
+	ID3D11Buffer* m_emitterCreationVB = nullptr;
+	ID3D11Buffer* m_emitterStreamOutVB = nullptr;
+	ID3D11Buffer* m_emittedParticlesVB = nullptr;
+
 	ID3D11Buffer* m_constantBuffers[NumConstantBuffers];
 	CbPerFrame m_cbPerFrame;
 
-	//ID3D11ShaderResourceView* mTexArraySRV;
-	ID3D11ShaderResourceView* mRandomTexSRV;
-	ID3D11ShaderResourceView* m_TexSRV;
-	std::unique_ptr<CommonStates> m_commonStates;
+	ID3D11ShaderResourceView* m_randomTextureSRV = nullptr;
+	ID3D11ShaderResourceView* m_textureSRV = nullptr;
+	std::unique_ptr<CommonStates> m_commonStates = nullptr;
 
 	std::wstring m_shaderFolder = L"Shader/";
 	std::wstring m_shaderFilePrefix;
