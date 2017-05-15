@@ -165,15 +165,8 @@ void ShaderLab::render()
 
 	m_deviceContext->DrawAuto();
 
-	//TODO: create own vertex buffer?
-	//render raycast hit
-	//if (m_raycastHitResult.IsHit)
-	//	m_raycastHitSphere->Draw(Matrix::CreateTranslation(m_raycastHitResult.ImpactPoint), m_camera.GetView(), m_camera.GetProj());
-	
-	m_fireParticles.Draw(m_deviceContext, m_renderTargetView);
+	m_fireParticles.Draw(m_deviceContext, m_renderTargetView, m_depthStencilView, m_rasterizerState, &m_viewport, 1);
 
-	float blendFactor[] = { 0.0f, 0.0f, 0.0f, 0.0f };
-	m_deviceContext->OMSetBlendState(0, blendFactor, 0xffffffff);
 	//Present Frame!!
 	m_swapChain->Present(0, 0);
 }

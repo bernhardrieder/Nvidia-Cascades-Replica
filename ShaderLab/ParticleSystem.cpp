@@ -24,11 +24,6 @@ ParticleSystem::~ParticleSystem()
 	releaseTextureArray();
 }
 
-//void ParticleSystem::SetEyePos(const XMFLOAT4& eyePosW)
-//{
-//	m_cbPerFrame.EyePosW = eyePosW;
-//}
-
 void ParticleSystem::SetEmitPos(const XMFLOAT3& emitPosW)
 {
 	m_cbPerFrame.EmitPosW = { emitPosW.x, emitPosW.y, emitPosW.z, 0.f };
@@ -72,6 +67,7 @@ bool ParticleSystem::Initialize(const std::wstring& particleNamePrefixInShaderFi
 	}
 
 	m_commonStates = std::make_unique<CommonStates>(device);
+	m_samplerLinearWrap = m_commonStates->LinearWrap();
 	return true;
 }
 
@@ -95,7 +91,7 @@ void ParticleSystem::Update(ID3D11DeviceContext* deviceContext, const float& dt,
 	mAge += dt;
 }
 
-void ParticleSystem::Draw(ID3D11DeviceContext* dc, ID3D11RenderTargetView* renderTarget)
+void ParticleSystem::Draw(ID3D11DeviceContext* dc, ID3D11RenderTargetView* renderTarget, ID3D11DepthStencilView* depthStencilView, ID3D11RasterizerState* pRasterizerState, const D3D11_VIEWPORT* pViewports, const size_t& numOfViewports)
 {
 	if (!m_emitPosSet)
 		return;
@@ -103,8 +99,18 @@ void ParticleSystem::Draw(ID3D11DeviceContext* dc, ID3D11RenderTargetView* rende
 	dc->IASetInputLayout(m_vsInputLayout);
 	dc->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
 
-	UINT stride = sizeof(Particle);
-	UINT offset = 0;
+	drawPassEmitter(dc);
+
+	// ping-pong the vertex buffers
+	std::swap(mDrawVB, mStreamOutVB);
+
+	drawPassDraw(dc, renderTarget, depthStencilView, pRasterizerState, pViewports, numOfViewports);
+}
+
+void ParticleSystem::drawPassEmitter(ID3D11DeviceContext* dc)
+{
+	const UINT stride = sizeof(Particle);
+	const UINT offset = 0;
 
 	// On the first pass, use the initialization VB.  Otherwise, use
 	// the VB that contains the current particle list.
@@ -113,45 +119,24 @@ void ParticleSystem::Draw(ID3D11DeviceContext* dc, ID3D11RenderTargetView* rende
 	else
 		dc->IASetVertexBuffers(0, 1, &mDrawVB, &stride, &offset);
 
-	//
-	// Draw the current particle list using stream-out only to update them.  
-	// The updated vertices are streamed-out to the target VB. 
-	//
-	dc->SOSetTargets(1, &mStreamOutVB, &offset);
-
-	/*
-	technique11 StreamOutTech
-	{
-		pass P0
-		{
-			SetVertexShader( CompileShader( vs_5_0, StreamOutVS() ) );
-			SetGeometryShader( gsStreamOut );
-
-			// disable pixel shader for stream-out only
-			SetPixelShader(NULL);
-
-			// we must also disable the depth buffer for stream-out only
-			SetDepthStencilState( DisableDepth, 0 );
-		}
-	}
-	*/
 	dc->VSSetShader(m_vsInit, nullptr, 0);
 
 	dc->GSSetShader(m_gsInit, nullptr, 0);
 	dc->GSSetConstantBuffers(0, 1, &m_constantBuffers[PerFrame]);
 	dc->GSSetShaderResources(0, 1, &mRandomTexSRV);
-	auto samplerLinearWrap = m_commonStates->LinearWrap();
-	dc->GSSetSamplers(0, 1, &samplerLinearWrap);
-	
-	//dc->RSSetState(nullptr);
-	//dc->RSSetViewports(0, nullptr);
+	dc->GSSetSamplers(0, 1, &m_samplerLinearWrap);
+
+	// Draw the current particle list using stream-out only to update them.  
+	// The updated vertices are streamed-out to the target VB. 
+	dc->SOSetTargets(1, &mStreamOutVB, &offset);
+
+	//disable the rest for the emitter pass
+	dc->RSSetState(nullptr);
+	dc->RSSetViewports(0, nullptr);
 	dc->PSSetShader(nullptr, nullptr, 0);
 	dc->OMSetRenderTargets(0, nullptr, nullptr);
 	dc->OMSetDepthStencilState(nullptr, 0);
 
-
-	//auto depthNone = m_commonStates->DepthNone();
-	//dc->OMSetDepthStencilState(depthNone, 1);
 
 	if (mFirstRun)
 	{
@@ -163,32 +148,18 @@ void ParticleSystem::Draw(ID3D11DeviceContext* dc, ID3D11RenderTargetView* rende
 		dc->DrawAuto();
 	}
 
-	// done streaming-out--unbind the vertex buffer
-	ID3D11Buffer* bufferArray[1] = { 0 };
-	dc->SOSetTargets(1, bufferArray, &offset);
+	// done SO --> unbind VB
+	dc->SOSetTargets(0, nullptr, nullptr);
+}
 
-	// ping-pong the vertex buffers
-	std::swap(mDrawVB, mStreamOutVB);
+void ParticleSystem::drawPassDraw(ID3D11DeviceContext* dc, ID3D11RenderTargetView* renderTarget, ID3D11DepthStencilView* depthStencilView, ID3D11RasterizerState* pRasterizerState, const D3D11_VIEWPORT* pViewports, const size_t& numOfViewports)
+{	//draw pass
 
+	const UINT stride = sizeof(Particle);
+	const UINT offset = 0;
 
-	//
 	// Draw the updated particle system we just streamed-out. 
-	//
 	dc->IASetVertexBuffers(0, 1, &mDrawVB, &stride, &offset);
-	/*
-	technique11 DrawTech
-	{
-		pass P0
-		{
-			SetVertexShader(   CompileShader( vs_5_0, DrawVS() ) );
-			SetGeometryShader( CompileShader( gs_5_0, DrawGS() ) );
-			SetPixelShader(    CompileShader( ps_5_0, DrawPS() ) );
-
-			SetBlendState(AdditiveBlending, float4(0.0f, 0.0f, 0.0f, 0.0f), 0xffffffff);
-			SetDepthStencilState( NoDepthWrites, 0 );
-		}
-	}
-	*/
 
 	dc->VSSetShader(m_vsDraw, nullptr, 0);
 	dc->VSSetConstantBuffers(0, 1, &m_constantBuffers[PerFrame]);
@@ -196,21 +167,25 @@ void ParticleSystem::Draw(ID3D11DeviceContext* dc, ID3D11RenderTargetView* rende
 	dc->GSSetShader(m_gsDraw, nullptr, 0);
 	dc->GSSetConstantBuffers(0, 1, &m_constantBuffers[PerFrame]);
 
+	dc->RSSetState(pRasterizerState);
+	dc->RSSetViewports(numOfViewports, pViewports);
+
 	dc->PSSetShader(m_psDraw, nullptr, 0);
-	//dc->PSSetShaderResources(1, 1, &mTexArraySRV);
 	dc->PSSetShaderResources(1, 1, &m_TexSRV);
-	dc->PSSetSamplers(0, 1, &samplerLinearWrap);
+	dc->PSSetSamplers(0, 1, &m_samplerLinearWrap);
 
 	auto depthRead = m_commonStates->DepthRead();
-	dc->OMSetRenderTargets(1, &renderTarget, nullptr);
+	dc->OMSetRenderTargets(1, &renderTarget, depthStencilView);
 	dc->OMSetDepthStencilState(depthRead, 1);
 
 	auto blendAdd = m_commonStates->Additive();
 	FLOAT blendFactor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
 	dc->OMSetBlendState(blendAdd, blendFactor, 0xffffffff);
 
-	//todo: set rendertarget????????
 	dc->DrawAuto();
+
+	//reset blendstate
+	dc->OMSetBlendState(nullptr, {}, 0xffffffff);
 }
 
 
@@ -226,8 +201,8 @@ bool ParticleSystem::loadInitShaders(ID3D11Device* device)
 {
 	ID3DBlob *vsBlob, *gsBlob;
 
-	std::wstring compiledVSPath = m_shaderFolder + m_shaderFilePrefix + m_shaderFileSuffixes.InitVS + m_shaderFileSuffixes.Extension;
-	std::wstring compiledGSPath = m_shaderFolder + m_shaderFilePrefix + m_shaderFileSuffixes.InitGSWithSO + m_shaderFileSuffixes.Extension;
+	std::wstring compiledVSPath = m_shaderFolder + m_shaderFilePrefix + m_shaderFileSuffixes.EmitVS + m_shaderFileSuffixes.Extension;
+	std::wstring compiledGSPath = m_shaderFolder + m_shaderFilePrefix + m_shaderFileSuffixes.EmitGSWithSO + m_shaderFileSuffixes.Extension;
 
 	HRESULT HR_VS, HR_GS;
 	HR_VS = D3DReadFileToBlob(compiledVSPath.c_str(), &vsBlob);

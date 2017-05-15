@@ -147,10 +147,10 @@
     <FxCompile Include="Shader\FireParticle_Draw_VS.hlsl">
       <Filter>Shader\Particles\Fire</Filter>
     </FxCompile>
-    <FxCompile Include="Shader\FireParticle_Init_GSWithSO.hlsl">
+    <FxCompile Include="Shader\FireParticle_Emit_GSWithSO.hlsl">
       <Filter>Shader\Particles\Fire</Filter>
     </FxCompile>
-    <FxCompile Include="Shader\FireParticle_Init_VS.hlsl">
+    <FxCompile Include="Shader\FireParticle_Emit_VS.hlsl">
       <Filter>Shader\Particles\Fire</Filter>
     </FxCompile>
   </ItemGroup>

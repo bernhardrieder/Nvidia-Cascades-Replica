@@ -24,9 +24,12 @@ public:
 
 	void Reset();
 	void Update(ID3D11DeviceContext* deviceContext, const float& dt, const float& gameTime, const Camera& camera);
-	void Draw(ID3D11DeviceContext* dc, ID3D11RenderTargetView* renderTarget);
+	void Draw(ID3D11DeviceContext* dc, ID3D11RenderTargetView* renderTarget, ID3D11DepthStencilView* depthStencilView, ID3D11RasterizerState* pRasterizerState, const D3D11_VIEWPORT* pViewports, const size_t& numOfViewports);
 
 private:
+	void drawPassEmitter(ID3D11DeviceContext* dc);
+	void drawPassDraw(ID3D11DeviceContext* dc, ID3D11RenderTargetView* renderTarget, ID3D11DepthStencilView* depthStencilView, ID3D11RasterizerState* pRasterizerState, const D3D11_VIEWPORT* pViewports, const size_t& numOfViewports);
+
 	bool loadShaders(ID3D11Device* device);
 	bool loadInitShaders(ID3D11Device* device);
 	bool loadDrawShaders(ID3D11Device* device);
@@ -68,7 +71,7 @@ private:
 	float mAge;
 	bool m_emitPosSet = false;
 
-	//init
+	//emitter
 	ID3D11VertexShader* m_vsInit = nullptr;
 	ID3D11GeometryShader* m_gsInit = nullptr;
 	//draw
@@ -77,6 +80,8 @@ private:
 	ID3D11PixelShader* m_psDraw = nullptr;
 	//general
 	ID3D11InputLayout* m_vsInputLayout = nullptr;
+
+	ID3D11SamplerState* m_samplerLinearWrap = nullptr;
 
 	ID3D11Buffer* mInitVB;
 	ID3D11Buffer* mDrawVB;
@@ -93,8 +98,8 @@ private:
 	std::wstring m_shaderFilePrefix;
 	const struct ShaderFileSuffixes
 	{
-		const std::wstring InitVS = L"Particle_Init_VS";
-		const std::wstring InitGSWithSO = L"Particle_Init_GSWithSO";
+		const std::wstring EmitVS = L"Particle_Emit_VS";
+		const std::wstring EmitGSWithSO = L"Particle_Emit_GSWithSO";
 		const std::wstring DrawVS = L"Particle_Draw_VS";
 		const std::wstring DrawGS = L"Particle_Draw_GS";
 		const std::wstring DrawPS = L"Particle_Draw_PS";
