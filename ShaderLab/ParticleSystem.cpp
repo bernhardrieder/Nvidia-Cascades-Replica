@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "ParticleSystem.h"
+#include <random>
 
 
 ParticleSystem::ParticleSystem()
@@ -335,13 +336,17 @@ bool ParticleSystem::createVertexBuffers(ID3D11Device* device)
 
 bool ParticleSystem::createRandomTextureSRV(ID3D11Device* device)
 {
+	std::random_device rd;
+	std::mt19937_64 mt(rd());
+	std::uniform_real_distribution<float> dist(-1, 1);
+
 	XMFLOAT4 randomValues[1024];
 	for (int i = 0; i < 1024; ++i)
 	{
-		randomValues[i].x = MathHelper::RandF(-1.0f, 1.0f);
-		randomValues[i].y = MathHelper::RandF(-1.0f, 1.0f);
-		randomValues[i].z = MathHelper::RandF(-1.0f, 1.0f);
-		randomValues[i].w = MathHelper::RandF(-1.0f, 1.0f);
+		randomValues[i].x = dist(mt);
+		randomValues[i].y = dist(mt);
+		randomValues[i].z = dist(mt);
+		randomValues[i].w = dist(mt);
 	}
 
 	D3D11_SUBRESOURCE_DATA initData;

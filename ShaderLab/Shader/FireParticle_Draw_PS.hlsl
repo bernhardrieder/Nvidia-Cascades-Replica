@@ -11,5 +11,7 @@ struct g2pConnector
 float4 main(g2pConnector g2p) : SV_TARGET
 {
     float4 color = gTex.Sample(samLinear, g2p.Tex) * g2p.Color;
+    if(g2p.DistanceToInitialPosition > 1.5f)
+        color.rgb = 0.1f;
     return color;
 }
