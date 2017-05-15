@@ -8,7 +8,7 @@ ParticleSystem::ParticleSystem()
 	m_cbPerFrame.GameTime = 0.0f;
 	m_cbPerFrame.DeltaTime = 0.0f;
 
-	m_cbPerFrame.EyePositionWorld = {0.0f, 0.0f, 0.0f, 0.f};
+	m_cbPerFrame.EyePositionWorld = { 0.0f, 0.0f, 0.0f, 0.f };
 	m_cbPerFrame.EmitterPositionWorld = {0.0f, 0.0f, 0.0f, 0.f};
 	m_cbPerFrame.EmitterDirectionWorld = {0.0f, 1.0f, 0.0f, 0.f};
 }

@@ -21,6 +21,8 @@ ShaderLab::~ShaderLab()
 	unloadShaders();
 	releaseTextures();
 	releaseSampler();
+	for (auto particle : m_fireParticles)
+		delete particle;
 }
 
 bool ShaderLab::Initialize()
@@ -49,12 +51,17 @@ bool ShaderLab::Initialize()
 		return false;
 	}
 
-	auto fireTextureFile = m_textureFilesPath + L"flare0" + m_textureFilenameExtension;
-	if (!m_fireParticles.Initialize(L"Fire", fireTextureFile, 500, m_device))
+	//test a fire particle
+	m_fireParticles.push_back(new ParticleSystem);
+	m_fireParticlesTextureFile = m_textureFilesPath + m_fireParticlesTextureFile + m_textureFilenameExtension;
+	if (!m_fireParticles[0]->Initialize(m_fireParticlesShaderNamePrefix, m_fireParticlesTextureFile, 500, m_device))
 	{
-		MessageBox(nullptr, TEXT("Failed to initialize fire ParticleSystem!"), TEXT("Error"), MB_OK);
+		MessageBox(nullptr, TEXT("Failed to initialize a test fire ParticleSystem!"), TEXT("Error"), MB_OK);
 		return false;
 	}
+	delete m_fireParticles[0];
+	m_fireParticles.clear();
+	m_fireParticles.shrink_to_fit();
 
 	m_commonStates = std::make_unique<CommonStates>(m_device);
 	m_camera.SetPosition(0., 0.0f, -20.f);
@@ -95,7 +102,8 @@ void ShaderLab::update(float deltaTime)
 		m_updateCbPerApplication = false;
 	}
 
-	m_fireParticles.Update(m_deviceContext, m_cbPerFrame.DeltaTime, m_cbPerFrame.AppTime, m_camera);
+	for (int i = 0; i < m_fireParticles.size(); ++i)
+		m_fireParticles[i]->Update(m_deviceContext, m_cbPerFrame.DeltaTime, m_cbPerFrame.AppTime, m_camera);
 }
 
 void ShaderLab::render()
@@ -164,7 +172,8 @@ void ShaderLab::render()
 
 	m_deviceContext->DrawAuto();
 
-	m_fireParticles.Draw(m_deviceContext, m_renderTargetView, m_depthStencilView, m_rasterizerState, &m_viewport, 1);
+	for (int i = 0; i < m_fireParticles.size(); ++i)
+		m_fireParticles[i]->Draw(m_deviceContext, m_renderTargetView, m_depthStencilView, m_rasterizerState, &m_viewport, 1);
 
 	//Present Frame!!
 	m_swapChain->Present(0, 0);
@@ -343,13 +352,24 @@ void ShaderLab::checkAndProcessMouseInput(float deltaTime)
 	{
 		Ray resultRay;
 		m_raycastHitResult = raycast(state.x, state.y, resultRay);
-		m_fireParticles.Reset();
 		if (m_raycastHitResult.IsHit)
 		{
 			std::cout << "Raycast hit object! Position: (" << std::to_string(m_raycastHitResult.ImpactPoint.x) << ", " << std::to_string(m_raycastHitResult.ImpactPoint.y) << ", " << std::to_string(m_raycastHitResult.ImpactPoint.z) << ")\n";
-			m_fireParticles.SetEmitterPosition(m_raycastHitResult.ImpactPoint);
+			
+			m_fireParticles.push_back(new ParticleSystem);
+			m_fireParticles[m_fireParticles.size() - 1]->Initialize(m_fireParticlesShaderNamePrefix, m_fireParticlesTextureFile, 1000, m_device);
+			m_fireParticles[m_fireParticles.size() - 1]->SetEmitterPosition(m_raycastHitResult.ImpactPoint);
 		}
-	
+	}	
+	if (m_mouseStateTracker.middleButton == m_mouseStateTracker.PRESSED)
+	{
+		for (int i = 0; i < m_fireParticles.size(); ++i)
+		{
+			m_fireParticles[i]->Reset();
+			delete m_fireParticles[i];
+		}
+		m_fireParticles.clear();
+		m_fireParticles.shrink_to_fit();
 	}
 }
 

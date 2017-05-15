@@ -28,17 +28,15 @@ static float3 gAccelW = { 0.0f, 7.8f, 0.0f };
 // when we expand point particle into a quad.
 static float2 gQuadTexC[4] =
 {
-    float2(0.0f, 1.0f),
     float2(1.0f, 1.0f),
-	float2(0.0f, 0.0f),
-	float2(1.0f, 0.0f)
+	float2(1.0f, 0.0f),
+    float2(0.0f, 1.0f),
+    float2(0.0f, 0.0f)
 };
-
 
 // Random texture used to generate random numbers in shaders.
 Texture1D gRandomTex : register(t0);
-// Array of textures for texturing the particles.
-//Texture2DArray gTexArray : register(t1);
+// particle texture
 Texture2D gTex : register(t1);
 
 SamplerState samLinear : register(s0);

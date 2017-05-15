@@ -1,10 +1,5 @@
 #include "FireParticle.hlsli"
 
-// The stream-out GS is just responsible for emitting 
-// new particles and destroying old particles.  The logic
-// programed here will generally vary from particle system
-// to particle system, as the destroy/spawn rules will be 
-// different.
 [maxvertexcount(2)]
 void main(point Particle particle[1], inout PointStream<Particle> outStream)
 {
@@ -15,16 +10,16 @@ void main(point Particle particle[1], inout PointStream<Particle> outStream)
 		// time to emit a new particle?
         if (particle[0].Age > 0.005f)
         {
-            
-            float3 vRandom = RandUnitVec3(gRandomTex, samLinear, gGameTime, 0);
-            vRandom.x *= 0.5f;
-            vRandom.z *= 0.5f;
-			
+            float3 randomVector = RandUnitVec3(gRandomTex, samLinear, gGameTime, 0);
+            randomVector.x *= 0.2f;
+            randomVector.z *= 0.2f;
+            float3 randRangeZeroToOne = randomVector * 0.5f + 0.5f;
+
             Particle p;
             p.InitialPosW = float4(gEmitPosW.xyz, 0.f);
-            p.InitialVelW = 4.0f * float4(vRandom, 0.f);
-            p.SizeW = float2(3.0f, 3.0f);
-            p.Age = 0.0f;
+            p.InitialVelW = 4.0f * float4(randomVector.xyz, 0.f);
+            p.SizeW = max(float2(randRangeZeroToOne.x, randRangeZeroToOne.x) * 5.f, float2(1.f, 1.f));
+            p.Age = 0.f;
             p.Type = PT_FLARE;
 			
             outStream.Append(p);
@@ -39,7 +34,7 @@ void main(point Particle particle[1], inout PointStream<Particle> outStream)
     else
     {
 		// Specify conditions to keep particle; this may vary from system to system.
-        if (particle[0].Age <= 1.0f) // == lifetime
+        if (particle[0].Age <= 1.0f) // == maxLifetime
             outStream.Append(particle[0]);
     }
     outStream.RestartStrip();
