@@ -77,6 +77,7 @@ inline void SafeRelease(T& ptr)
 #define _USE_MATH_DEFINES
 #include <cmath>
 #include <algorithm>
+#include "ParticleSystem.h"
 #include "ShaderLab.h"
 #include "Camera.h"
 #include "RockVertexBufferGenerator.h"
