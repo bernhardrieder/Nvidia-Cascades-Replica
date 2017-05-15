@@ -140,16 +140,18 @@ void ParticleSystem::Draw(ID3D11DeviceContext* dc, ID3D11RenderTargetView* rende
 	dc->GSSetShader(m_gsInit, nullptr, 0);
 	dc->GSSetConstantBuffers(0, 1, &m_constantBuffers[PerFrame]);
 	dc->GSSetShaderResources(0, 1, &mRandomTexSRV);
+	auto samplerLinearWrap = m_commonStates->LinearWrap();
+	dc->GSSetSamplers(0, 1, &samplerLinearWrap);
 	
 	//dc->RSSetState(nullptr);
 	//dc->RSSetViewports(0, nullptr);
-	//dc->PSSetShader(nullptr, nullptr, 0);
-	//dc->OMSetRenderTargets(0, nullptr, nullptr);
-	//dc->OMSetDepthStencilState(nullptr, 0);
+	dc->PSSetShader(nullptr, nullptr, 0);
+	dc->OMSetRenderTargets(0, nullptr, nullptr);
+	dc->OMSetDepthStencilState(nullptr, 0);
 
 
-	auto depthNone = m_commonStates->DepthNone();
-	dc->OMSetDepthStencilState(depthNone, 1);
+	//auto depthNone = m_commonStates->DepthNone();
+	//dc->OMSetDepthStencilState(depthNone, 1);
 
 	if (mFirstRun)
 	{
@@ -197,6 +199,7 @@ void ParticleSystem::Draw(ID3D11DeviceContext* dc, ID3D11RenderTargetView* rende
 	dc->PSSetShader(m_psDraw, nullptr, 0);
 	//dc->PSSetShaderResources(1, 1, &mTexArraySRV);
 	dc->PSSetShaderResources(1, 1, &m_TexSRV);
+	dc->PSSetSamplers(0, 1, &samplerLinearWrap);
 
 	auto depthRead = m_commonStates->DepthRead();
 	dc->OMSetRenderTargets(1, &renderTarget, nullptr);

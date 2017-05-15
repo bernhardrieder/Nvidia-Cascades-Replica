@@ -21,21 +21,21 @@ cbuffer cbPerFrame : register(b0)
     float gDeltaTime;
 }
 
-cbuffer cbFixed : register(b1)
-{
+//cbuffer cbFixed : register(b1)
+//{
 	// Net constant acceleration used to accerlate the particles.
-    float3 gAccelW = { 0.0f, 7.8f, 0.0f };
+    static float3 gAccelW = { 0.0f, 7.8f, 0.0f };
 	
 	// Texture coordinates used to stretch texture over quad 
 	// when we expand point particle into a quad.
-    float2 gQuadTexC[4] =
+    static float2 gQuadTexC[4] =
     {
         float2(0.0f, 1.0f),
 		float2(1.0f, 1.0f),
 		float2(0.0f, 0.0f),
 		float2(1.0f, 0.0f)
     };
-};
+//};
 
 
 // Random texture used to generate random numbers in shaders.
@@ -44,12 +44,7 @@ Texture1D gRandomTex : register(t0);
 //Texture2DArray gTexArray : register(t1);
 Texture2D gTex : register(t1);
 
-SamplerState samLinear : register(s0)
-{
-    Filter = MIN_MAG_MIP_LINEAR;
-    AddressU = WRAP;
-    AddressV = WRAP;
-};
+SamplerState samLinear : register(s0);
 
 float3 RandUnitVec3(Texture1D randomTex, SamplerState linearSampler, float gameTime, float offset)
 {

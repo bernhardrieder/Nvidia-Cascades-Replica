@@ -6,7 +6,7 @@
 // to particle system, as the destroy/spawn rules will be 
 // different.
 [maxvertexcount(2)]
-void main(point Particle particle[1], inout TriangleStream<Particle> outStream)
+void main(point Particle particle[1], inout PointStream<Particle> outStream)
 {
     particle[0].Age += gDeltaTime;
 	
@@ -39,7 +39,7 @@ void main(point Particle particle[1], inout TriangleStream<Particle> outStream)
     else
     {
 		// Specify conditions to keep particle; this may vary from system to system.
-        if (particle[0].Age <= 1.0f)
+        if (particle[0].Age <= 1.0f) // == lifetime
             outStream.Append(particle[0]);
     }
     outStream.RestartStrip();

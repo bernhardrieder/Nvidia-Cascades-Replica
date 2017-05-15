@@ -49,10 +49,11 @@ void main(point v2gConnector v2g[1], inout TriangleStream<g2pConnector> outStrea
 		[unroll]
         for (int i = 0; i < 4; ++i)
         {
-            gout.PosH = mul(v[i], gViewProj);
+            gout.PosH = mul(gViewProj, v[i]);
             gout.Tex = gQuadTexC[i];
             gout.Color = v2g[0].Color;
             outStream.Append(gout);
         }
+        outStream.RestartStrip();
     }
 }

@@ -19,6 +19,7 @@ v2gConnector main(Particle particle)
 	
 	// fade color with time
     float opacity = 1.0f - smoothstep(0.0f, 1.0f, t / 1.0f);
+    //float opacity = 1.f;
     v2g.Color = float4(1.0f, 1.0f, 1.0f, opacity);
 	
     v2g.SizeW = particle.SizeW;
