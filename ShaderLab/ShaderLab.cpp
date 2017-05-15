@@ -49,6 +49,13 @@ bool ShaderLab::Initialize()
 		return false;
 	}
 
+	auto fileName = m_textureFilesPath + L"flare0" + m_textureFilenameExtension;
+	std::vector<std::wstring> fireParticlesFilenames = { fileName };
+	if (!m_fireParticles.Initialize(L"Fire", m_device, m_deviceContext, fireParticlesFilenames, 500))
+	{
+		MessageBox(nullptr, TEXT("Failed to initialize fire ParticleSystem!"), TEXT("Error"), MB_OK);
+		return false;
+	}
 
 	m_commonStates = std::make_unique<CommonStates>(m_device);
 	m_camera.SetPosition(0., 0.0f, -20.f);
@@ -88,6 +95,8 @@ void ShaderLab::update(float deltaTime)
 		m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Application], 0, nullptr, &m_cbPerApplication, 0, 0);
 		m_updateCbPerApplication = false;
 	}
+
+	m_fireParticles.Update(m_deviceContext, m_cbPerFrame.DeltaTime, m_cbPerFrame.AppTime, m_camera);
 }
 
 void ShaderLab::render()
@@ -158,9 +167,13 @@ void ShaderLab::render()
 
 	//TODO: create own vertex buffer?
 	//render raycast hit
-	if (m_raycastHitResult.IsHit)
-		m_raycastHitSphere->Draw(Matrix::CreateTranslation(m_raycastHitResult.ImpactPoint), m_camera.GetView(), m_camera.GetProj());
+	//if (m_raycastHitResult.IsHit)
+	//	m_raycastHitSphere->Draw(Matrix::CreateTranslation(m_raycastHitResult.ImpactPoint), m_camera.GetView(), m_camera.GetProj());
 	
+	m_fireParticles.Draw(m_deviceContext, m_renderTargetView);
+
+	float blendFactor[] = { 0.0f, 0.0f, 0.0f, 0.0f };
+	m_deviceContext->OMSetBlendState(0, blendFactor, 0xffffffff);
 	//Present Frame!!
 	m_swapChain->Present(0, 0);
 }
@@ -338,8 +351,13 @@ void ShaderLab::checkAndProcessMouseInput(float deltaTime)
 	{
 		Ray resultRay;
 		m_raycastHitResult = raycast(state.x, state.y, resultRay);
+		m_fireParticles.Reset();
 		if (m_raycastHitResult.IsHit)
+		{
 			std::cout << "Raycast hit object! Position: (" << std::to_string(m_raycastHitResult.ImpactPoint.x) << ", " << std::to_string(m_raycastHitResult.ImpactPoint.y) << ", " << std::to_string(m_raycastHitResult.ImpactPoint.z) << ")\n";
+			m_fireParticles.SetEmitPos(m_raycastHitResult.ImpactPoint);
+		}
+	
 	}
 }
 

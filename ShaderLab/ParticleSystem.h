@@ -1,4 +1,5 @@
 #pragma once
+#include "Camera.h"
 
 using namespace DirectX;
 using namespace DirectX::SimpleMath;
@@ -16,14 +17,14 @@ public:
 	//float GetAge()const;
 
 	//void SetEyePos(const XMFLOAT4& eyePosW);
-	void SetEmitPos(const XMFLOAT4& emitPosW);
-	void SetEmitDir(const XMFLOAT4& emitDirW);
+	void SetEmitPos(const XMFLOAT3& emitPosW);
+	void SetEmitDir(const XMFLOAT3& emitDirW);
 
-	bool Initialize(const std::wstring& particleNamePrefixInShaderFile, ID3D11Device* device, ID3D11ShaderResourceView* texArraySRV, ID3D11ShaderResourceView* randomTexSRV, unsigned maxParticles);
+	bool Initialize(const std::wstring& particleNamePrefixInShaderFile, ID3D11Device* device, ID3D11DeviceContext* context, const std::vector<std::wstring>& filenamesOfUniformTextures, unsigned maxParticles);
 
 	void Reset();
 	void Update(ID3D11DeviceContext* deviceContext, const float& dt, const float& gameTime, const Camera& camera);
-	void Draw(ID3D11DeviceContext* dc, const Camera& cam);
+	void Draw(ID3D11DeviceContext* dc, ID3D11RenderTargetView* renderTarget);
 
 private:
 	bool loadShaders(ID3D11Device* device);
@@ -35,11 +36,15 @@ private:
 	void releaseConstantBuffers();
 	bool createVertexBuffers(ID3D11Device* device);
 	void releaseVertexBuffers();
+	bool createRandomTexture(ID3D11Device* device);
+	void releaseRandomTexture();
+	bool createTextureArray(ID3D11Device* device, ID3D11DeviceContext* context, const std::vector<std::wstring>& filenames);
+	void releaseTextureArray();
 
 	struct Particle
 	{
-		XMFLOAT3 InitialPos;
-		XMFLOAT3 InitialVel;
+		XMFLOAT4 InitialPos;
+		XMFLOAT4 InitialVel;
 		XMFLOAT2 Size;
 		float Age;
 		unsigned int Type;
@@ -61,6 +66,7 @@ private:
 	unsigned mMaxParticles;
 	bool mFirstRun;
 	float mAge;
+	bool m_emitPosSet = false;
 
 	//init
 	ID3D11VertexShader* m_vsInit = nullptr;
@@ -78,16 +84,24 @@ private:
 	ID3D11Buffer* m_constantBuffers[NumConstantBuffers];
 	CbPerFrame m_cbPerFrame;
 
-	ID3D11ShaderResourceView* mTexArraySRV;
+	//ID3D11ShaderResourceView* mTexArraySRV;
 	ID3D11ShaderResourceView* mRandomTexSRV;
+	ID3D11ShaderResourceView* m_TexSRV;
+	std::unique_ptr<CommonStates> m_commonStates;
 
+	std::wstring m_shaderFolder = L"Shader/";
 	std::wstring m_shaderFilePrefix;
 	const struct ShaderFileSuffixes
 	{
-		const std::wstring InitVS = L"Particle_Init_VS.hlsl";
-		const std::wstring InitGSWithSO = L"Particle_Init_GSWithSO.hlsl";
-		const std::wstring DrawVS = L"Particle_Draw_VS.hlsl";
-		const std::wstring DrawGS = L"Particle_Draw_GS.hlsl";
-		const std::wstring DrawPS = L"Particle_Draw_PS.hlsl";
+		const std::wstring InitVS = L"Particle_Init_VS";
+		const std::wstring InitGSWithSO = L"Particle_Init_GSWithSO";
+		const std::wstring DrawVS = L"Particle_Draw_VS";
+		const std::wstring DrawGS = L"Particle_Draw_GS";
+		const std::wstring DrawPS = L"Particle_Draw_PS";
+#if _DEBUG
+		const std::wstring Extension = L"_d.cso";
+#else
+		const std::wstring Extension = L".cso";
+#endif
 	} m_shaderFileSuffixes;
 };

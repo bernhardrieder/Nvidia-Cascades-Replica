@@ -1,7 +1,7 @@
 struct Particle
 {
-    float3 InitialPosW : SV_POSITION;
-    float3 InitialVelW : VELOCITY;
+    float4 InitialPosW : SV_POSITION;
+    float4 InitialVelW : VELOCITY;
     float2 SizeW : SIZE;
     float Age : AGE;
     uint Type : TYPE;
@@ -12,19 +12,16 @@ struct Particle
 
 cbuffer cbPerFrame : register(b0)
 {
-    float3 gEyePosW;
-	
-	// for when the emit position/direction is varying
-    float3 gEmitPosW;
-    float3 gEmitDirW;
-	
-    float gGameTime;
-    float gTimeStep;
-    float gDeltaTime;
     float4x4 gViewProj;
+    float4 gEyePosW;
+	// for when the emit position/direction is varying
+    float4 gEmitPosW;
+    float4 gEmitDirW;
+    float gGameTime;
+    float gDeltaTime;
 }
 
-cbuffer cbFixed
+cbuffer cbFixed : register(b1)
 {
 	// Net constant acceleration used to accerlate the particles.
     float3 gAccelW = { 0.0f, 7.8f, 0.0f };
@@ -44,7 +41,8 @@ cbuffer cbFixed
 // Random texture used to generate random numbers in shaders.
 Texture1D gRandomTex : register(t0);
 // Array of textures for texturing the particles.
-Texture2DArray gTexArray : register(t1);
+//Texture2DArray gTexArray : register(t1);
+Texture2D gTex : register(t1);
 
 SamplerState samLinear : register(s0)
 {

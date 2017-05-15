@@ -135,4 +135,6 @@ private:
 	std::vector<Triangle> m_rockTrianglesTransformed;
 	HitResult m_raycastHitResult;
 	std::unique_ptr<DirectX::GeometricPrimitive> m_raycastHitSphere;
+
+	ParticleSystem m_fireParticles;
 };

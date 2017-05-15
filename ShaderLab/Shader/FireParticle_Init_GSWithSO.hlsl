@@ -8,7 +8,7 @@
 [maxvertexcount(2)]
 void main(point Particle particle[1], inout TriangleStream<Particle> outStream)
 {
-    particle[0].Age += gTimeStep;
+    particle[0].Age += gDeltaTime;
 	
     if (particle[0].Type == PT_EMITTER)
     {
@@ -21,8 +21,8 @@ void main(point Particle particle[1], inout TriangleStream<Particle> outStream)
             vRandom.z *= 0.5f;
 			
             Particle p;
-            p.InitialPosW = gEmitPosW.xyz;
-            p.InitialVelW = 4.0f * vRandom;
+            p.InitialPosW = float4(gEmitPosW.xyz, 0.f);
+            p.InitialVelW = 4.0f * float4(vRandom, 0.f);
             p.SizeW = float2(3.0f, 3.0f);
             p.Age = 0.0f;
             p.Type = PT_FLARE;
@@ -42,4 +42,6 @@ void main(point Particle particle[1], inout TriangleStream<Particle> outStream)
         if (particle[0].Age <= 1.0f)
             outStream.Append(particle[0]);
     }
+    outStream.RestartStrip();
+
 }

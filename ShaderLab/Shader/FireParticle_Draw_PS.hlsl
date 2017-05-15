@@ -9,5 +9,5 @@ struct g2pConnector
 
 float4 main(g2pConnector g2p) : SV_TARGET
 {
-    return gTexArray.Sample(samLinear, float3(g2p.Tex, 0)) * g2p.Color;
+    return gTex.Sample(samLinear, g2p.Tex) * g2p.Color;
 }
