@@ -16,6 +16,18 @@
     <Filter Include="Shader">
       <UniqueIdentifier>{d650ab46-911c-4f1a-9f69-d286b3526842}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shader\Density">
+      <UniqueIdentifier>{223014e6-e0cc-435b-bdc6-370a234f5062}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shader\Rock">
+      <UniqueIdentifier>{54d68c76-a0cf-44ef-87f9-3b765fae9bd0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shader\Particles">
+      <UniqueIdentifier>{a26f2017-e3c1-4dfb-84a9-9cb2e3090773}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shader\Particles\Fire">
+      <UniqueIdentifier>{b170de86-5820-4a48-a1b4-68b54ead93f2}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -54,6 +66,15 @@
     <ClInclude Include="ShaderHelper.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="CollisionDetectionHelper.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="KdTree.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ParticleSystem.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -77,6 +98,15 @@
     <ClCompile Include="Density3DTextureGenerator.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="CollisionDetectionHelper.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="KdTree.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ParticleSystem.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Image Include="small.ico">
@@ -88,25 +118,40 @@
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Shader\create_density_tex3d_GS.hlsl">
-      <Filter>Shader</Filter>
+      <Filter>Shader\Density</Filter>
     </FxCompile>
     <FxCompile Include="Shader\create_density_tex3d_PS.hlsl">
-      <Filter>Shader</Filter>
+      <Filter>Shader\Density</Filter>
     </FxCompile>
     <FxCompile Include="Shader\create_density_tex3d_VS.hlsl">
-      <Filter>Shader</Filter>
-    </FxCompile>
-    <FxCompile Include="Shader\generate_rock_VB_GS.hlsl">
-      <Filter>Shader</Filter>
-    </FxCompile>
-    <FxCompile Include="Shader\generate_rock_VB_VS.hlsl">
-      <Filter>Shader</Filter>
-    </FxCompile>
-    <FxCompile Include="Shader\drawRockVS.hlsl">
-      <Filter>Shader</Filter>
+      <Filter>Shader\Density</Filter>
     </FxCompile>
     <FxCompile Include="Shader\drawRockPS.hlsl">
-      <Filter>Shader</Filter>
+      <Filter>Shader\Rock</Filter>
+    </FxCompile>
+    <FxCompile Include="Shader\drawRockVS.hlsl">
+      <Filter>Shader\Rock</Filter>
+    </FxCompile>
+    <FxCompile Include="Shader\generate_rock_VB_GS.hlsl">
+      <Filter>Shader\Rock</Filter>
+    </FxCompile>
+    <FxCompile Include="Shader\generate_rock_VB_VS.hlsl">
+      <Filter>Shader\Rock</Filter>
+    </FxCompile>
+    <FxCompile Include="Shader\FireParticle_Draw_GS.hlsl">
+      <Filter>Shader\Particles\Fire</Filter>
+    </FxCompile>
+    <FxCompile Include="Shader\FireParticle_Draw_PS.hlsl">
+      <Filter>Shader\Particles\Fire</Filter>
+    </FxCompile>
+    <FxCompile Include="Shader\FireParticle_Draw_VS.hlsl">
+      <Filter>Shader\Particles\Fire</Filter>
+    </FxCompile>
+    <FxCompile Include="Shader\FireParticle_Emit_GSWithSO.hlsl">
+      <Filter>Shader\Particles\Fire</Filter>
+    </FxCompile>
+    <FxCompile Include="Shader\FireParticle_Emit_VS.hlsl">
+      <Filter>Shader\Particles\Fire</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
@@ -118,6 +163,9 @@
     <None Include="packages.config" />
     <None Include="Shader\inoise.hlsli">
       <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\FireParticle.hlsli">
+      <Filter>Shader\Particles\Fire</Filter>
     </None>
   </ItemGroup>
 </Project>

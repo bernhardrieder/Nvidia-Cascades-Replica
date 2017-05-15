@@ -22,14 +22,13 @@ public:
 
 protected:
 	//called in Gameloop by Run()
-	virtual void update(float deltaTime) = 0;
+	virtual void update(float deltaTime);
+	virtual void checkAndProcessKeyboardInput(float deltaTime) = 0;
+	virtual void checkAndProcessMouseInput(float deltaTime) = 0;
 	//called in Gameloop by Run()
-	virtual void render(float deltaTime);
+	virtual void render();
 	virtual void cleanup();
 	virtual void onResize();
-	virtual void onMouseDown(WPARAM btnState, int x, int y) { }
-	virtual void onMouseUp(WPARAM btnState, int x, int y) { }
-	virtual void onMouseMove(WPARAM btnState, int x, int y) { }
 
 	BOOL initWin32Application(HINSTANCE hInstance, int nCmdShow);
 	ATOM registerWin32Class(HINSTANCE hInstance);
@@ -74,5 +73,10 @@ protected:
 	bool m_minimized = false;
 	bool m_maximized = true;
 	bool m_resizing = false;
-};
 
+	// Input Modules
+	std::unique_ptr<DirectX::Keyboard> m_keyboard;
+	DirectX::Keyboard::KeyboardStateTracker m_keyboardStateTracker;
+	std::unique_ptr<DirectX::Mouse> m_mouse;
+	DirectX::Mouse::ButtonStateTracker m_mouseStateTracker;
+};

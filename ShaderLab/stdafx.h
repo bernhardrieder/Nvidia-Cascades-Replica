@@ -26,6 +26,7 @@
 #include <d3dcompiler.h>
 #include <DirectXMath.h>
 #include <DirectXColors.h>
+#include <DirectXCollision.h>
 
 // Link library dependencies
 #pragma comment(lib, "d3d11.lib")
@@ -47,17 +48,9 @@ inline void SafeRelease(T& ptr)
 #include <vector>
 #include <memory>
 #include <wchar.h>
+#include <iostream>
+#include <minwinbase.h>
 #include <exception>
-#include "MathHelper.h"
-#include "ShaderHelper.h"
-#include "D3D11App.h"
-#define _USE_MATH_DEFINES
-#include <cmath>
-#include <algorithm>
-#include "ShaderLab.h"
-#include "Camera.h"
-#include "RockVertexBufferGenerator.h"
-#include "Density3DTextureGenerator.h"
 
 //directx toolkit
 #include "CommonStates.h"
@@ -77,3 +70,18 @@ inline void SafeRelease(T& ptr)
 #include "SpriteFont.h"
 #include "VertexTypes.h"
 #include "WICTextureLoader.h"
+
+#include "MathHelper.h"
+#include "ShaderHelper.h"
+#include "D3D11App.h"
+#define _USE_MATH_DEFINES
+#include <cmath>
+#include <algorithm>
+#include "ParticleSystem.h"
+#include "ShaderLab.h"
+#include "Camera.h"
+#include "RockVertexBufferGenerator.h"
+#include "Density3DTextureGenerator.h"
+#include "CollisionDetectionHelper.h"
+#include "KdTree.h"
+

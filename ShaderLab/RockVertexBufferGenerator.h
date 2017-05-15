@@ -1,4 +1,5 @@
 #pragma once
+#include "CollisionDetectionHelper.h"
 
 class RockVertexBufferGenerator
 {
@@ -9,6 +10,7 @@ public:
 	bool Initialize(ID3D11Device* device, DirectX::XMINT3 densityTextureSize);
 	bool Generate(ID3D11DeviceContext* pDeviceContext, ID3D11ShaderResourceView* pDensityTexture3DShaderResourceView) const;
 	ID3D11Buffer* GetVertexBuffer() const;
+	std::vector<Triangle> extractTrianglesFromVertexBuffer(ID3D11DeviceContext* pDeviceContext, const DirectX::SimpleMath::Matrix& triangleSRT) const;
 
 	struct GeometryShaderOutput
 	{
@@ -58,6 +60,8 @@ private:
 	ID3D11InputLayout* m_vertexShaderInputLayout = nullptr;
 	ID3D11GeometryShader* m_geometryShader = nullptr;
 	ID3D11Buffer* m_vertexBuffer = nullptr;
+	ID3D11Buffer* m_stagedVertexBuffer = nullptr;
+	ID3D11Query* m_deviceStats = nullptr;
 	std::unique_ptr<DirectX::CommonStates> m_commonStates = nullptr;
 
 	ID3D11Buffer* m_dummyVertexBuffer = nullptr;

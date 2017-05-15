@@ -49,6 +49,11 @@ bool D3D11App::Initialize()
 		MessageBox(nullptr, TEXT("Failed to initalize DirectX."), TEXT("Error"), MB_OK);
 		return false;
 	}
+
+	m_keyboard = std::make_unique<Keyboard>();
+	m_mouse = std::make_unique<Mouse>();
+	m_mouse->SetWindow(m_windowHandle);
+
 	return true;
 }
 
@@ -83,14 +88,14 @@ int D3D11App::Run()
 			m_deltaTime = std::min<float>(m_deltaTime, maxTimeStep);
 
 			update(m_deltaTime);
-			render(m_deltaTime);
+			render();
 		}
 	}
 
 	return static_cast<int>(msg.wParam);
 }
 
-void D3D11App::render(float deltaTime)
+void D3D11App::render()
 {
 	assert(m_device);
 	assert(m_deviceContext);
@@ -312,6 +317,12 @@ D3D11_VIEWPORT const* D3D11App::GetViewport() const
 	return &m_viewport;
 }
 
+void D3D11App::update(float deltaTime)
+{
+	checkAndProcessKeyboardInput(deltaTime);
+	checkAndProcessMouseInput(deltaTime);
+}
+
 ATOM D3D11App::registerWin32Class(HINSTANCE hInstance)
 {
 	WNDCLASSEXW wcex;
@@ -456,19 +467,30 @@ LRESULT D3D11App::MsgProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		reinterpret_cast<MINMAXINFO*>(lParam)->ptMinTrackSize.x = 200;
 		reinterpret_cast<MINMAXINFO*>(lParam)->ptMinTrackSize.y = 200;
 		return 0;
-	case WM_LBUTTONDOWN:
-	case WM_MBUTTONDOWN:
-	case WM_RBUTTONDOWN:
-		onMouseDown(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
-		return 0;
-	case WM_LBUTTONUP:
-	case WM_MBUTTONUP:
-	case WM_RBUTTONUP:
-		onMouseUp(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
-		return 0;
+	case WM_ACTIVATEAPP:
+		Keyboard::ProcessMessage(message, wParam, lParam);
+		Mouse::ProcessMessage(message, wParam, lParam);
+		break;
+	case WM_INPUT:
 	case WM_MOUSEMOVE:
-		onMouseMove(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
-		return 0;
+	case WM_LBUTTONDOWN:
+	case WM_LBUTTONUP:
+	case WM_RBUTTONDOWN:
+	case WM_RBUTTONUP:
+	case WM_MBUTTONDOWN:
+	case WM_MBUTTONUP:
+	case WM_MOUSEWHEEL:
+	case WM_XBUTTONDOWN:
+	case WM_XBUTTONUP:
+	case WM_MOUSEHOVER:
+		Mouse::ProcessMessage(message, wParam, lParam);
+		break;
+	case WM_KEYDOWN:
+	case WM_SYSKEYDOWN:
+	case WM_KEYUP:
+	case WM_SYSKEYUP:
+		Keyboard::ProcessMessage(message, wParam, lParam);
+		break;
 	default:
 		return DefWindowProc(hWnd, message, wParam, lParam);
 	}
