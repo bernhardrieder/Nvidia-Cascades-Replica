@@ -18,7 +18,9 @@ void main(point Particle particle[1], inout PointStream<Particle> outStream)
             Particle p;
             p.InitialPosW = float4(gEmitPosW.xyz, 0.f);
             p.InitialVelW = randRangeZeroToOne.y * 4.0f * float4(randomVector.xyz, 0.f);
-            p.SizeW = max(float2(1.f, 1.f), float2(randRangeZeroToOne.x, randRangeZeroToOne.x) * 5.f);
+            p.SizeW = particle[0].SizeW * max(0.1f,randRangeZeroToOne.xy);
+            //offset position so billboard doesn't appear in geometry
+            p.InitialPosW += normalize(gEmitDirW) * (p.SizeW.y * 0.4f);
             p.Age = 0.f;
             p.Type = PT_FLARE;
 			

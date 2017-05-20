@@ -314,6 +314,11 @@ bool ParticleSystem::createVertexBuffers(ID3D11Device* device)
 	ZeroMemory(&p, sizeof(ParticleShaderInput));
 	p.LifeTime = 0.0f;
 	p.Type = 0;
+	std::random_device rd;
+	std::mt19937_64 mt(rd());
+	std::uniform_real_distribution<float> dist(0.5f, 7.5f);
+	float xy = dist(mt);
+	p.Size = { xy, xy };
 
 	D3D11_SUBRESOURCE_DATA initData;
 	initData.pSysMem = &p;
