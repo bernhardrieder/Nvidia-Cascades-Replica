@@ -97,10 +97,11 @@ void ShaderLab::update(float deltaTime)
 	m_cbPerFrame.DeltaTime = deltaTime;
 
 	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Frame], 0, nullptr, &m_cbPerFrame, 0, 0);
+	m_shadowMap.Update(m_deviceContext, m_sceneBounds, m_cbPerFrame.SunLightDirection);
 	
 	m_cbPerObject.World = m_worldMatrix;
 	m_cbPerObject.WorldInverseTranspose = (m_worldMatrix.Invert()).Transpose();
-	m_cbPerObject.ShadowTransform = m_shadowMap.CalculateShadowTransform(m_sceneBounds, m_cbPerFrame.SunLightDirection);
+	m_cbPerObject.ShadowTransform = m_shadowMap.GetShadowTransform();
 	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Object], 0, nullptr, &m_cbPerObject, 0, 0);
 
 	if(m_updateCbPerApplication)
@@ -141,7 +142,7 @@ void ShaderLab::render()
 	}
 
 	auto vb = m_rockVBGenerator.GetVertexBuffer();
-	m_shadowMap.RenderIntoShadowMap(m_deviceContext, vb, m_inputLayoutDrawRockVS, m_constantBuffers[CB_Frame], m_constantBuffers[CB_Object]);
+	m_shadowMap.RenderIntoShadowMap(m_deviceContext, vb, m_inputLayoutDrawRockVS, m_worldMatrix);
 
 	m_deviceContext->ClearRenderTargetView(m_renderTargetView, DirectX::Colors::CornflowerBlue);
 	m_deviceContext->ClearDepthStencilView(m_depthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);

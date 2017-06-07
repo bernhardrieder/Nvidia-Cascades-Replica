@@ -16,6 +16,9 @@ ShadowMap::~ShadowMap()
 	SafeRelease(m_depthMapSRV);
 	SafeRelease(m_depthMapDSV);
 	SafeRelease(m_buildVS);
+	SafeRelease(m_constantBuffers[CB_Frame]);
+	SafeRelease(m_constantBuffers[CB_Object]);
+	SafeRelease(m_rasterizerStateDepth);
 }
 
 bool ShadowMap::Initialize(ID3D11Device* const device)
@@ -45,6 +48,7 @@ bool ShadowMap::Initialize(ID3D11Device* const device)
 	dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
 	dsvDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
 	dsvDesc.Texture2D.MipSlice = 0;
+
 	if (FAILED(hr = device->CreateDepthStencilView(depthMapTexture, &dsvDesc, &m_depthMapDSV)))
 		return false;
 
@@ -59,7 +63,7 @@ bool ShadowMap::Initialize(ID3D11Device* const device)
 	// View saves a reference to the texture so we can release our reference.
 	SafeRelease(depthMapTexture);
 
-	if(!loadShader(device) || !createRasterizerState(device))
+	if(!loadShader(device) || !createRasterizerState(device) || !createConstantBuffer(device))
 	{
 		return false;
 	}
@@ -67,9 +71,25 @@ bool ShadowMap::Initialize(ID3D11Device* const device)
 	return true;
 }
 
-void ShadowMap::RenderIntoShadowMap(ID3D11DeviceContext* const deviceContext, ID3D11Buffer* const vertexBuffer, ID3D11InputLayout* const inputLayout, ID3D11Buffer* const cbPerFrame, ID3D11Buffer* const cbPerObject) const
+void ShadowMap::Update(ID3D11DeviceContext* const deviceContext, DirectX::BoundingSphere sceneBounds, DirectX::SimpleMath::Vector3 sunLightDirection)
 {
+	calculateShadowTransform(sceneBounds, sunLightDirection);
+	deviceContext->UpdateSubresource(m_constantBuffers[CB_Frame], 0, nullptr, &m_cbPerFrame, 0, 0);
+}
+
+void ShadowMap::RenderIntoShadowMap(ID3D11DeviceContext* const deviceContext, ID3D11Buffer* const vertexBuffer, ID3D11InputLayout* const inputLayout, const DirectX::SimpleMath::Matrix& world)
+{
+	m_cbPerObject.World = world;
+	deviceContext->UpdateSubresource(m_constantBuffers[CB_Object], 0, nullptr, &m_cbPerObject, 0, 0);
+
+	deviceContext->RSSetViewports(1, &m_viewport);
+	// Set null render target because we are only going to draw to depth buffer.
+	// Setting a null render target will disable color writes.
+	ID3D11RenderTargetView* renderTargets = nullptr;
+	deviceContext->OMSetRenderTargets(1, &renderTargets, m_depthMapDSV);
 	deviceContext->ClearDepthStencilView(m_depthMapDSV, D3D11_CLEAR_DEPTH, 1.0f, 0);
+
+
 
 	const UINT vertexStride = sizeof(RockVertexBufferGenerator::GeometryShaderOutput);
 	const UINT offset = 0;
@@ -78,20 +98,15 @@ void ShadowMap::RenderIntoShadowMap(ID3D11DeviceContext* const deviceContext, ID
 	deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	deviceContext->VSSetShader(m_buildVS, nullptr, 0);
-	deviceContext->VSSetConstantBuffers(0, 1, &cbPerFrame);
-	deviceContext->VSSetConstantBuffers(1, 1, &cbPerObject);
+	deviceContext->VSSetConstantBuffers(0, 1, &m_constantBuffers[CB_Frame]);
+	deviceContext->VSSetConstantBuffers(1, 1, &m_constantBuffers[CB_Object]);
 
 	deviceContext->GSSetShader(nullptr, nullptr, 0);
 	
-	deviceContext->RSSetViewports(1, &m_viewport);
 	deviceContext->RSSetState(m_rasterizerStateDepth);
 
 	deviceContext->PSSetShader(nullptr, nullptr, 0);
 
-	// Set null render target because we are only going to draw to depth buffer.
-	// Setting a null render target will disable color writes.
-	ID3D11RenderTargetView* renderTargets = nullptr;
-	deviceContext->OMSetRenderTargets(1, &renderTargets, m_depthMapDSV);
 	deviceContext->OMSetDepthStencilState(nullptr, 0);
 
 	deviceContext->DrawAuto();
@@ -100,10 +115,10 @@ void ShadowMap::RenderIntoShadowMap(ID3D11DeviceContext* const deviceContext, ID
 	deviceContext->OMSetRenderTargets(0, nullptr, nullptr);
 }
 
-DirectX::SimpleMath::Matrix ShadowMap::CalculateShadowTransform(DirectX::BoundingSphere sceneBounds, DirectX::SimpleMath::Vector3 sunLightDirection)
+void ShadowMap::calculateShadowTransform(DirectX::BoundingSphere sceneBounds, DirectX::SimpleMath::Vector3 sunLightDirection)
 {	
 	// Only the first "main" light casts a shadow.
-	Vector3 lightPos = -2.0f * sceneBounds.Radius * -sunLightDirection;
+	Vector3 lightPos = -1.0f * sceneBounds.Radius * sunLightDirection;
 	Vector3 targetPos = Vector3::Zero;
 
 	Matrix lightView = XMMatrixLookAtLH(lightPos, targetPos, Vector3::Up);
@@ -128,12 +143,18 @@ DirectX::SimpleMath::Matrix ShadowMap::CalculateShadowTransform(DirectX::Boundin
 		0.0f, 0.0f, 1.0f, 0.0f,
 		0.5f, 0.5f, 0.0f, 1.0f);
 
-	return lightView*lightProj*T;
+	m_cbPerFrame.LightViewProj = lightView*lightProj;
+	m_shadowTransform = lightView*lightProj*T;
 }
 
 ID3D11ShaderResourceView* ShadowMap::GetDepthMapSRV() const
 {
 	return m_depthMapSRV;
+}
+
+const DirectX::SimpleMath::Matrix& ShadowMap::GetShadowTransform() const
+{
+	return m_shadowTransform;
 }
 
 bool ShadowMap::loadShader(ID3D11Device* const device)
@@ -192,6 +213,29 @@ bool ShadowMap::createRasterizerState(ID3D11Device* const device)
 	HRESULT hr;
 	// Create the rasterizer state object.
 	if (FAILED(hr = device->CreateRasterizerState(&rasterizerDesc, &m_rasterizerStateDepth)))
+		return false;
+
+	return true;
+}
+
+bool ShadowMap::createConstantBuffer(ID3D11Device* const device)
+{
+	// Create the constant buffers for the variables defined in the vertex shader.
+	D3D11_BUFFER_DESC constantBufferDesc;
+	ZeroMemory(&constantBufferDesc, sizeof(D3D11_BUFFER_DESC));
+	constantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	constantBufferDesc.CPUAccessFlags = 0;
+	constantBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+
+	HRESULT hr;
+	constantBufferDesc.ByteWidth = sizeof(CbPerFrame);
+	hr = device->CreateBuffer(&constantBufferDesc, nullptr, &m_constantBuffers[CB_Frame]);
+	if (FAILED(hr))
+		return false;
+
+	constantBufferDesc.ByteWidth = sizeof(CbPerObject);
+	hr = device->CreateBuffer(&constantBufferDesc, nullptr, &m_constantBuffers[CB_Object]);
+	if (FAILED(hr))
 		return false;
 
 	return true;

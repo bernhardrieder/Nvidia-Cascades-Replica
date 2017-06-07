@@ -142,6 +142,6 @@ private:
 
 	const int m_shadowMapSize = 2048;
 	ShadowMap m_shadowMap;
-	DirectX::BoundingSphere m_sceneBounds = BoundingSphere(Vector3::Zero, 10000);
+	DirectX::BoundingSphere m_sceneBounds = BoundingSphere(Vector3::Zero, 50);
 	ID3D11SamplerState* m_shadowMapSampler = nullptr;
 };
