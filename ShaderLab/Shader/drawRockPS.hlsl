@@ -1,9 +1,12 @@
+#include "LightHelper.hlsli"
+
 struct v2pConnector
 {
     float4 posH : SV_Position; //homogeneous clipspace
     float3 posW : POSITION; //worldspace coord
     float3 VertexNormalW : NORMAL0; //worldspace vertex normal
     float3 SurfaceNormalW : NORMAL1; //worldspace surface normal
+    float4 ShadowPosH : SHADOW;
 };
 
 cbuffer PerApplication : register(b0)
@@ -36,8 +39,21 @@ Texture2D lichen1_bump : register(t6);
 Texture2D lichen2_bump : register(t7);
 Texture2D lichen3_bump : register(t8);
 
+Texture2D shadowMap : register(t9);
+
 SamplerState LinearRepeatAnsio : register(s0);
 SamplerState LinearRepeat : register(s1);
+
+SamplerComparisonState samShadow : register(s2);
+//{
+//    Filter = COMPARISON_MIN_MAG_LINEAR_MIP_POINT;
+//    AddressU = BORDER;
+//    AddressV = BORDER;
+//    AddressW = BORDER;
+//    BorderColor = float4(0.0f, 0.0f, 0.0f, 0.0f);
+
+//    ComparisonFunc = LESS;
+//};
 
 #define TEXTURE_SCALE 0.2
 #define FLAT_SHADING 0
@@ -177,9 +193,13 @@ float4 main(v2pConnector v2p) : SV_Target
                                   bumpMapNormal[2] * blend_weights.zzz;  // z-axis
 
     //----------------------- SIMPLE LIGHTNING FUNCTION ---------------------------
-    float4 lightIntensity = dot(g_sunLightDirection.xyz, normalize(pixelNormalW + blendedBumpMapNormal));
-    float4 final_color = saturate(lightIntensity * blendedColor);
-    float4 ambient = (0.1f * blendedColor);
-    final_color = normalize((float4(final_color.xyz, 1) + ambient));
-    return final_color;
+    //float4 lightIntensity = dot(g_sunLightDirection.xyz, normalize(pixelNormalW + blendedBumpMapNormal));
+    //float4 final_color = saturate(lightIntensity * blendedColor);
+    //float4 ambient = (0.1f * blendedColor);
+    //final_color = normalize((float4(final_color.xyz, 1) + ambient));
+    //return final_color;
+
+    float shadowFactor = CalcShadowFactor(samShadow, shadowMap, v2p.ShadowPosH);
+    return blendedColor * (shadowFactor);
 }
+

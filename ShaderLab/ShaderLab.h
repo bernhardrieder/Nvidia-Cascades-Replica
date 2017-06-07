@@ -7,9 +7,7 @@
 #include <SimpleMath.h>
 #include "CollisionDetectionHelper.h"
 #include "KdTree.h"
-
-using namespace DirectX;
-using namespace DirectX::SimpleMath;
+#include "ShadowMap.h"
 
 class ShaderLab : public D3D11App
 {
@@ -38,6 +36,7 @@ private:
 	void releaseSampler();
 
 	HitResult raycast(int sx, int sy, DirectX::SimpleMath::Ray& outRay);
+
 private:
 	// Shader resources
 	enum ShaderConstanBufferType
@@ -81,6 +80,7 @@ private:
 	{
 		XMMATRIX World;
 		XMMATRIX WorldInverseTranspose;
+		XMMATRIX ShadowTransform;
 	};
 
 	CbPerApplication m_cbPerApplication;
@@ -91,11 +91,11 @@ private:
 	float m_sunPhi = DirectX::XM_PIDIV2;
 
 	// Vertex buffer data
-	ID3D11InputLayout* m_inputLayoutSimpleVS = nullptr;
+	ID3D11InputLayout* m_inputLayoutDrawRockVS = nullptr;
 
 	// Shader data
-	ID3D11VertexShader* m_simpleVS = nullptr;
-	ID3D11PixelShader* m_simplePS = nullptr;
+	ID3D11VertexShader* m_drawRockVS = nullptr;
+	ID3D11PixelShader* m_drawRockPS = nullptr;
 
 #if _DEBUG
 	const wchar_t* m_compiledVSPath = L"Shader/drawRockVS_d.cso";
@@ -139,4 +139,9 @@ private:
 	std::wstring m_fireParticlesShaderNamePrefix = L"Fire";
 	std::wstring m_fireParticlesTextureFile = L"flare0";
 	std::vector<ParticleSystem*> m_fireParticles;
+
+	const int m_shadowMapSize = 2048;
+	ShadowMap m_shadowMap;
+	DirectX::BoundingSphere m_sceneBounds = BoundingSphere(Vector3::Zero, 10000);
+	ID3D11SamplerState* m_shadowMapSampler = nullptr;
 };

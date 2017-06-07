@@ -5,7 +5,7 @@
 using namespace DirectX;
 using namespace DirectX::SimpleMath;
 
-ShaderLab::ShaderLab(HINSTANCE hInstance, int nCmdShow) : D3D11App(hInstance, nCmdShow), m_rockSize(30, 100, 30)
+ShaderLab::ShaderLab(HINSTANCE hInstance, int nCmdShow) : D3D11App(hInstance, nCmdShow), m_rockSize(30, 100, 30), m_shadowMap({m_shadowMapSize, m_shadowMapSize})
 {
 	m_cbPerFrame.AppTime = 0;	
 	
@@ -75,6 +75,12 @@ bool ShaderLab::Initialize()
 	m_rockKdTreeRoot = std::make_unique<KDNode>();
 	m_raycastHitSphere = DirectX::GeometricPrimitive::CreateSphere(m_deviceContext);
 
+	if(!m_shadowMap.Initialize(m_device))
+	{
+		MessageBox(nullptr, TEXT("Failed to initialize the shadowmap!"), TEXT("Error"), MB_OK);
+		return false;
+	}
+
 	return true;
 }
 
@@ -91,9 +97,10 @@ void ShaderLab::update(float deltaTime)
 	m_cbPerFrame.DeltaTime = deltaTime;
 
 	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Frame], 0, nullptr, &m_cbPerFrame, 0, 0);
-
+	
 	m_cbPerObject.World = m_worldMatrix;
 	m_cbPerObject.WorldInverseTranspose = (m_worldMatrix.Invert()).Transpose();
+	m_cbPerObject.ShadowTransform = m_shadowMap.CalculateShadowTransform(m_sceneBounds, m_cbPerFrame.SunLightDirection);
 	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Object], 0, nullptr, &m_cbPerObject, 0, 0);
 
 	if(m_updateCbPerApplication)
@@ -133,18 +140,20 @@ void ShaderLab::render()
 		std::cout << " finished!\n";
 	}
 
+	auto vb = m_rockVBGenerator.GetVertexBuffer();
+	m_shadowMap.RenderIntoShadowMap(m_deviceContext, vb, m_inputLayoutDrawRockVS, m_constantBuffers[CB_Frame], m_constantBuffers[CB_Object]);
+
 	m_deviceContext->ClearRenderTargetView(m_renderTargetView, DirectX::Colors::CornflowerBlue);
 	m_deviceContext->ClearDepthStencilView(m_depthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 
 	const UINT vertexStride = sizeof(RockVertexBufferGenerator::GeometryShaderOutput);
 	const UINT offset = 0;
 
-	auto vb = m_rockVBGenerator.GetVertexBuffer();
 	m_deviceContext->IASetVertexBuffers(0, 1, &vb, &vertexStride, &offset);
-	m_deviceContext->IASetInputLayout(m_inputLayoutSimpleVS);
+	m_deviceContext->IASetInputLayout(m_inputLayoutDrawRockVS);
 	m_deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-	m_deviceContext->VSSetShader(m_simpleVS, nullptr, 0);
+	m_deviceContext->VSSetShader(m_drawRockVS, nullptr, 0);
 	m_deviceContext->VSSetConstantBuffers(0, 3, m_constantBuffers);
 
 	m_deviceContext->GSSetShader(nullptr, nullptr, 0);
@@ -152,11 +161,12 @@ void ShaderLab::render()
 	m_deviceContext->RSSetState(m_rasterizerState);
 	m_deviceContext->RSSetViewports(1, &m_viewport);
 
-	m_deviceContext->PSSetShader(m_simplePS, nullptr, 0);
+	m_deviceContext->PSSetShader(m_drawRockPS, nullptr, 0);
 	m_deviceContext->PSSetConstantBuffers(0, 2, m_constantBuffers);
 	auto sampler = m_commonStates->LinearWrap();
 	m_deviceContext->PSSetSamplers(0, 1, &m_lichenSampler);
 	m_deviceContext->PSSetSamplers(1, 1, &sampler);
+	m_deviceContext->PSSetSamplers(2, 1, &m_shadowMapSampler);
 	m_deviceContext->PSSetShaderResources(0, 1, &m_texturesSRVs[14]);
 	m_deviceContext->PSSetShaderResources(1, 1, &m_texturesSRVs[3]);
 	m_deviceContext->PSSetShaderResources(2, 1, &m_texturesSRVs[18]);
@@ -166,6 +176,8 @@ void ShaderLab::render()
 	m_deviceContext->PSSetShaderResources(6, 1, &m_texturesBumpSRVs[14]);
 	m_deviceContext->PSSetShaderResources(7, 1, &m_texturesBumpSRVs[3]);
 	m_deviceContext->PSSetShaderResources(8, 1, &m_texturesBumpSRVs[18]);
+	ID3D11ShaderResourceView* shadowMap = m_shadowMap.GetDepthMapSRV();
+	m_deviceContext->PSSetShaderResources(9, 1, &shadowMap);
 
 	m_deviceContext->OMSetRenderTargets(1, &m_renderTargetView, m_depthStencilView);
 	m_deviceContext->OMSetDepthStencilState(m_depthStencilState, 1);
@@ -177,6 +189,10 @@ void ShaderLab::render()
 
 	//Present Frame!!
 	m_swapChain->Present(0, 0);
+
+	//unbind shadow map as a shader input because we are going to render to it next frame
+	ID3D11ShaderResourceView* null[16]{ nullptr };
+	m_deviceContext->PSSetShaderResources(0, 16, null);
 }
 
 bool ShaderLab::loadShaders()
@@ -211,7 +227,7 @@ bool ShaderLab::loadShaders()
 	if (FAILED(hr))
 		return false;
 
-	hr = m_device->CreateVertexShader(vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize(), nullptr, &m_simpleVS);
+	hr = m_device->CreateVertexShader(vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize(), nullptr, &m_drawRockVS);
 	if (FAILED(hr))
 		return false;
 
@@ -223,7 +239,7 @@ bool ShaderLab::loadShaders()
 		{ "NORMAL", 1, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(VertexPosNormal,LocalSurfaceNormal), D3D11_INPUT_PER_VERTEX_DATA, 0 }
 	};
 
-	hr = m_device->CreateInputLayout(vertexLayoutDesc, _countof(vertexLayoutDesc), vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize(), &m_inputLayoutSimpleVS);
+	hr = m_device->CreateInputLayout(vertexLayoutDesc, _countof(vertexLayoutDesc), vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize(), &m_inputLayoutDrawRockVS);
 	if (FAILED(hr))
 		return false;
 
@@ -236,7 +252,7 @@ bool ShaderLab::loadShaders()
 	if (FAILED(hr))
 		return false;
 
-	hr = m_device->CreatePixelShader(pixelShaderBlob->GetBufferPointer(), pixelShaderBlob->GetBufferSize(), nullptr, &m_simplePS);
+	hr = m_device->CreatePixelShader(pixelShaderBlob->GetBufferPointer(), pixelShaderBlob->GetBufferSize(), nullptr, &m_drawRockPS);
 	if (FAILED(hr))
 		return false;
 
@@ -250,9 +266,9 @@ void ShaderLab::unloadShaders()
 	SafeRelease(m_constantBuffers[CB_Application]);
 	SafeRelease(m_constantBuffers[CB_Frame]);
 	SafeRelease(m_constantBuffers[CB_Object]);
-	SafeRelease(m_inputLayoutSimpleVS);
-	SafeRelease(m_simpleVS);
-	SafeRelease(m_simplePS);
+	SafeRelease(m_inputLayoutDrawRockVS);
+	SafeRelease(m_drawRockVS);
+	SafeRelease(m_drawRockPS);
 }
 
 void ShaderLab::onResize()
@@ -439,10 +455,25 @@ bool ShaderLab::createSampler(ID3D11Device* device)
 	desc.MaxLOD = FLT_MAX;
 	desc.ComparisonFunc = D3D11_COMPARISON_NEVER;
 	
-
 	HRESULT hr = device->CreateSamplerState(&desc, &m_lichenSampler);
 	if (FAILED(hr))
 		return false;
+
+	// SHADOW MAP SAMPLER
+	ZeroMemory(&desc, sizeof(D3D11_SAMPLER_DESC));
+	desc.Filter = D3D11_FILTER_MIN_MAG_LINEAR_MIP_POINT;
+	desc.AddressU = D3D11_TEXTURE_ADDRESS_BORDER;
+	desc.AddressV = D3D11_TEXTURE_ADDRESS_BORDER;
+	desc.AddressW = D3D11_TEXTURE_ADDRESS_BORDER;
+	desc.BorderColor[0] = 0.f;
+	desc.BorderColor[1] = 0.f;
+	desc.BorderColor[2] = 0.f;
+	desc.BorderColor[3] = 0.f;
+	desc.ComparisonFunc = D3D11_COMPARISON_LESS;
+
+	if (FAILED(hr = device->CreateSamplerState(&desc, &m_shadowMapSampler)))
+		return false;
+
 	return true;
 }
 

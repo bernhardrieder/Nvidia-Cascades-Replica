@@ -28,6 +28,9 @@
     <Filter Include="Shader\Particles\Fire">
       <UniqueIdentifier>{b170de86-5820-4a48-a1b4-68b54ead93f2}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shader\Shadow Mapping">
+      <UniqueIdentifier>{23174936-5f1a-43d2-9abc-6e7db9a160eb}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -75,6 +78,9 @@
     <ClInclude Include="ParticleSystem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ShadowMap.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -105,6 +111,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ParticleSystem.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ShadowMap.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -153,6 +162,9 @@
     <FxCompile Include="Shader\FireParticle_Emit_VS.hlsl">
       <Filter>Shader\Particles\Fire</Filter>
     </FxCompile>
+    <FxCompile Include="Shader\build_shadowmap_VS.hlsl">
+      <Filter>Shader\Shadow Mapping</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="ShaderLab.rc">
@@ -166,6 +178,9 @@
     </None>
     <None Include="Shader\FireParticle.hlsli">
       <Filter>Shader\Particles\Fire</Filter>
+    </None>
+    <None Include="Shader\LightHelper.hlsli">
+      <Filter>Shader</Filter>
     </None>
   </ItemGroup>
 </Project>
