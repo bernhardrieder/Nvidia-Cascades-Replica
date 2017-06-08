@@ -7,12 +7,13 @@ using namespace DirectX::SimpleMath;
 
 ShaderLab::ShaderLab(HINSTANCE hInstance, int nCmdShow) : D3D11App(hInstance, nCmdShow), m_rockSize(30, 100, 30), m_shadowMap({m_shadowMapSize, m_shadowMapSize})
 {
-	m_cbPerFrame.AppTime = 0;	
-	
+	m_cbPerFrame.AppTime = 0;
+
 	m_cbPerApplication.DisplacementScale = 2.f;
 	m_cbPerApplication.InitialStepIterations = 24;
 	m_cbPerApplication.RefinementStepIterations = 12;
 	m_cbPerApplication.ParallaxDepth = 15;
+	m_cbPerApplication.ShadowMode = static_cast<int>(ShadowModes::SoftShadow_PCF);
 }
 
 ShaderLab::~ShaderLab()
@@ -45,7 +46,7 @@ bool ShaderLab::Initialize()
 		MessageBox(nullptr, TEXT("Failed to load textures. Is Assets/Textures folder in execution folder?"), TEXT("Error"), MB_OK);
 		return false;
 	}
-	if(!createSampler(m_device))
+	if (!createSampler(m_device))
 	{
 		MessageBox(nullptr, TEXT("Failed create SamplerStates!"), TEXT("Error"), MB_OK);
 		return false;
@@ -75,7 +76,7 @@ bool ShaderLab::Initialize()
 	m_rockKdTreeRoot = std::make_unique<KDNode>();
 	m_raycastHitSphere = DirectX::GeometricPrimitive::CreateSphere(m_deviceContext);
 
-	if(!m_shadowMap.Initialize(m_device))
+	if (!m_shadowMap.Initialize(m_device))
 	{
 		MessageBox(nullptr, TEXT("Failed to initialize the shadowmap!"), TEXT("Error"), MB_OK);
 		return false;
@@ -90,7 +91,7 @@ void ShaderLab::update(float deltaTime)
 
 	m_cbPerFrame.View = m_camera.GetView();
 	m_cbPerFrame.ViewProj = m_camera.GetView() * m_camera.GetProj();
-	m_cbPerFrame.ScreenSize = { (float)m_windowWidth, (float)m_windowHeight, 0.f};
+	m_cbPerFrame.ScreenSize = {(float)m_windowWidth, (float)m_windowHeight, 0.f};
 	m_cbPerFrame.WorldEyePosition = static_cast<XMFLOAT3>(m_camera.GetPosition());
 	Vector3 sunLightDirection = -MathHelper::SphericalToCartesian(1.0f, m_sunTheta, m_sunPhi);
 	sunLightDirection.Normalize();
@@ -100,13 +101,13 @@ void ShaderLab::update(float deltaTime)
 
 	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Frame], 0, nullptr, &m_cbPerFrame, 0, 0);
 	m_shadowMap.Update(m_deviceContext, m_sceneBounds, m_cbPerFrame.SunLightDirection);
-	
+
 	m_cbPerObject.World = m_worldMatrix;
 	m_cbPerObject.WorldInverseTranspose = (m_worldMatrix.Invert()).Transpose();
 	m_cbPerObject.ShadowTransform = m_shadowMap.GetShadowTransform();
 	m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Object], 0, nullptr, &m_cbPerObject, 0, 0);
 
-	if(m_updateCbPerApplication)
+	if (m_updateCbPerApplication)
 	{
 		m_deviceContext->UpdateSubresource(m_constantBuffers[CB_Application], 0, nullptr, &m_cbPerApplication, 0, 0);
 		m_updateCbPerApplication = false;
@@ -184,6 +185,7 @@ void ShaderLab::render()
 	m_deviceContext->PSSetSamplers(0, 1, &m_lichenSampler);
 	m_deviceContext->PSSetSamplers(1, 1, &sampler);
 	m_deviceContext->PSSetSamplers(2, 1, &m_shadowMapSamplerPCF);
+	m_deviceContext->PSSetSamplers(3, 1, &m_shadowMapSamplerHard);
 	m_deviceContext->PSSetShaderResources(0, 1, &m_texturesSRVs[14]);
 	m_deviceContext->PSSetShaderResources(1, 1, &m_texturesSRVs[3]);
 	m_deviceContext->PSSetShaderResources(2, 1, &m_texturesSRVs[18]);
@@ -208,7 +210,7 @@ void ShaderLab::render()
 	m_swapChain->Present(0, 0);
 
 	//unbind shadow map as a shader input because we are going to render to it next frame
-	ID3D11ShaderResourceView* null[16]{ nullptr };
+	ID3D11ShaderResourceView* null[16]{nullptr};
 	m_deviceContext->PSSetShaderResources(0, 16, null);
 }
 
@@ -253,7 +255,7 @@ bool ShaderLab::loadShaders()
 	{
 		{"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(VertexPosNormal,LocalPosition), D3D11_INPUT_PER_VERTEX_DATA, 0},
 		{"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(VertexPosNormal,LocalVertexNormal), D3D11_INPUT_PER_VERTEX_DATA, 0},
-		{ "NORMAL", 1, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(VertexPosNormal,LocalSurfaceNormal), D3D11_INPUT_PER_VERTEX_DATA, 0 }
+		{"NORMAL", 1, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(VertexPosNormal,LocalSurfaceNormal), D3D11_INPUT_PER_VERTEX_DATA, 0}
 	};
 
 	hr = m_device->CreateInputLayout(vertexLayoutDesc, _countof(vertexLayoutDesc), vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize(), &m_inputLayoutDrawRockVS);
@@ -306,7 +308,7 @@ void ShaderLab::checkAndProcessKeyboardInput(float deltaTime)
 	}
 
 	m_keyboardStateTracker.Update(state);
-	
+
 	//m_keyboardStateTracker.IsKeyPressed(Keyboard::Keys::W) --> returns true if button is pressed (the first time)
 	//state.W --> return true if button is held
 
@@ -325,13 +327,13 @@ void ShaderLab::checkAndProcessKeyboardInput(float deltaTime)
 	//SUN ROTATION
 	m_sunPhi = MathHelper::Clamp(m_sunPhi, 0.1f, XM_PI);
 	if (state.Up)
-		m_sunPhi -= 1.0f*deltaTime;
+		m_sunPhi -= 1.0f * deltaTime;
 	if (state.Down)
-		m_sunPhi += 1.0f*deltaTime;
+		m_sunPhi += 1.0f * deltaTime;
 	if (state.Left)
-		m_sunTheta -= 1.0f*deltaTime;
+		m_sunTheta -= 1.0f * deltaTime;
 	if (state.Right)
-		m_sunTheta += 1.0f*deltaTime;
+		m_sunTheta += 1.0f * deltaTime;
 
 	//per app (mostly parallax elements) constant buffer
 	if (state.O)
@@ -340,7 +342,7 @@ void ShaderLab::checkAndProcessKeyboardInput(float deltaTime)
 		if (m_cbPerApplication.DisplacementScale < 0.0f)
 			m_cbPerApplication.DisplacementScale = 0.f;
 	}
-	if(state.P)
+	if (state.P)
 		m_cbPerApplication.DisplacementScale += 0.1f * deltaTime;
 	if (m_keyboardStateTracker.IsKeyPressed(Keyboard::Keys::K))
 	{
@@ -364,7 +366,13 @@ void ShaderLab::checkAndProcessKeyboardInput(float deltaTime)
 	if (state.M)
 		m_cbPerApplication.ParallaxDepth += 1.f * deltaTime;
 
-	if (state.O || state.P || state.K || state.L ||	state.N || state.M)
+
+	if (m_keyboardStateTracker.IsKeyPressed(Keyboard::Keys::F1))
+		m_cbPerApplication.ShadowMode = static_cast<int>(ShadowModes::HardShadows);
+	else if(m_keyboardStateTracker.IsKeyPressed(Keyboard::Keys::F2))
+		m_cbPerApplication.ShadowMode = static_cast<int>(ShadowModes::SoftShadow_PCF);
+
+	if (state.O || state.P || state.K || state.L || state.N || state.M || state.F1 || state.F2)
 		m_updateCbPerApplication = true;
 }
 
@@ -376,8 +384,8 @@ void ShaderLab::checkAndProcessMouseInput(float deltaTime)
 	if (m_mouseStateTracker.leftButton == m_mouseStateTracker.HELD)
 	{
 		// Make each pixel correspond to a quarter of a degree.
-		float dx = DirectX::XMConvertToRadians(0.10f*static_cast<float>(state.x - lastState.x));
-		float dy = DirectX::XMConvertToRadians(0.10f*static_cast<float>(state.y - lastState.y));
+		float dx = DirectX::XMConvertToRadians(0.10f * static_cast<float>(state.x - lastState.x));
+		float dy = DirectX::XMConvertToRadians(0.10f * static_cast<float>(state.y - lastState.y));
 
 		m_camera.Pitch(dy);
 		m_camera.RotateY(dx);
@@ -390,12 +398,12 @@ void ShaderLab::checkAndProcessMouseInput(float deltaTime)
 		if (m_raycastHitResult.IsHit)
 		{
 			std::cout << "Raycast hit object! Position: (" << std::to_string(m_raycastHitResult.ImpactPoint.x) << ", " << std::to_string(m_raycastHitResult.ImpactPoint.y) << ", " << std::to_string(m_raycastHitResult.ImpactPoint.z) << ")\n";
-			
+
 			m_fireParticles.push_back(new ParticleSystem);
 			m_fireParticles[m_fireParticles.size() - 1]->Initialize(m_fireParticlesShaderNamePrefix, m_fireParticlesTextureFile, 1000, m_device);
 			m_fireParticles[m_fireParticles.size() - 1]->SetEmitterPosition(m_raycastHitResult.ImpactPoint);
 		}
-	}	
+	}
 	if (m_mouseStateTracker.middleButton == m_mouseStateTracker.PRESSED)
 	{
 		for (int i = 0; i < m_fireParticles.size(); ++i)
@@ -473,7 +481,7 @@ bool ShaderLab::createSampler(ID3D11Device* device)
 	desc.MaxAnisotropy = 16;
 	desc.MaxLOD = FLT_MAX;
 	desc.ComparisonFunc = D3D11_COMPARISON_NEVER;
-	
+
 	HRESULT hr = device->CreateSamplerState(&desc, &m_lichenSampler);
 	if (FAILED(hr))
 		return false;
@@ -493,20 +501,27 @@ bool ShaderLab::createSampler(ID3D11Device* device)
 	if (FAILED(hr = device->CreateSamplerState(&desc, &m_shadowMapSamplerPCF)))
 		return false;
 
+
+	desc.Filter = D3D11_FILTER_MIN_MAG_LINEAR_MIP_POINT;
+
+	if (FAILED(hr = device->CreateSamplerState(&desc, &m_shadowMapSamplerHard)))
+		return false;
+
 	return true;
 }
 
 void ShaderLab::releaseSampler()
 {
 	SafeRelease(m_lichenSampler);
+	SafeRelease(m_shadowMapSamplerHard);
 	SafeRelease(m_shadowMapSamplerPCF);
 }
 
 HitResult ShaderLab::raycast(int sx, int sy, Ray& outRay)
-{	
+{
 	// Compute picking ray in view space.
-	float vx = (((+2.0f*sx) / m_windowWidth) - 1.0f) / m_camera.GetProj()(0, 0);
-	float vy = (((-2.0f*sy) / m_windowHeight) + 1.0f) / m_camera.GetProj()(1, 1);
+	float vx = (((+2.0f * sx) / m_windowWidth) - 1.0f) / m_camera.GetProj()(0, 0);
+	float vy = (((-2.0f * sy) / m_windowHeight) + 1.0f) / m_camera.GetProj()(1, 1);
 
 	Matrix invView = m_camera.GetView().Invert();
 

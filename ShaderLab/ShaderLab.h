@@ -58,6 +58,12 @@ private:
 		DirectX::XMFLOAT3 LocalSurfaceNormal;
 	};
 
+	enum class ShadowModes : int
+	{
+		HardShadows = 0,
+		SoftShadow_PCF,
+		SoftShadow_VSM
+	};
 	struct CbPerApplication
 	{
 		XMMATRIX Proj;
@@ -65,6 +71,7 @@ private:
 		float InitialStepIterations;
 		float RefinementStepIterations;
 		float ParallaxDepth;
+		int ShadowMode;
 	};
 
 	struct CbPerFrame
@@ -146,5 +153,6 @@ private:
 	const int m_shadowMapSize = 2048;
 	ShadowMap m_shadowMap;
 	DirectX::BoundingSphere m_sceneBounds;
+	ID3D11SamplerState* m_shadowMapSamplerHard = nullptr;
 	ID3D11SamplerState* m_shadowMapSamplerPCF = nullptr;
 };

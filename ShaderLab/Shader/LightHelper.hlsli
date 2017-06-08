@@ -1,6 +1,19 @@
 static const float SMAP_SIZE = 2048.0f;
 static const float SMAP_DX = 1.0f / SMAP_SIZE;
 
+float CalcShadowFactorHard(SamplerState samShadow, Texture2D shadowMap, float4 shadowPosH)
+{
+    // Complete projection by doing division by w.
+    shadowPosH.xyz /= shadowPosH.w;
+	
+	// Depth in NDC space.
+    float depth = shadowPosH.z;
+
+    float sampledValue = shadowMap.Sample(samShadow, shadowPosH.xy).r;
+
+    return depth <= sampledValue ? 1 : 0;
+}
+
 float CalcShadowFactorPCF(SamplerComparisonState samShadow,
                        Texture2D shadowMap,
 					   float4 shadowPosH)
