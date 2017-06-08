@@ -10,7 +10,8 @@ public:
 	bool Initialize(ID3D11Device* device, DirectX::XMINT3 densityTextureSize);
 	bool Generate(ID3D11DeviceContext* pDeviceContext, ID3D11ShaderResourceView* pDensityTexture3DShaderResourceView) const;
 	ID3D11Buffer* GetVertexBuffer() const;
-	std::vector<Triangle> extractTrianglesFromVertexBuffer(ID3D11DeviceContext* pDeviceContext, const DirectX::SimpleMath::Matrix& triangleSRT) const;
+	std::vector<Triangle> ExtractTrianglesFromVertexBuffer(ID3D11DeviceContext* pDeviceContext, const DirectX::SimpleMath::Matrix& triangleSRT) const;
+	std::vector<DirectX::SimpleMath::Vector3> ExtractVerticesFromVertexBuffer(ID3D11DeviceContext* pDeviceContext, const DirectX::SimpleMath::Matrix& SRT) const;
 
 	struct GeometryShaderOutput
 	{

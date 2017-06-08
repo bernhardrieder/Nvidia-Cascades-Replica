@@ -1,9 +1,12 @@
+#include "LightHelper.hlsli"
+
 struct v2pConnector
 {
     float4 posH : SV_Position; //homogeneous clipspace
     float3 posW : POSITION; //worldspace coord
     float3 VertexNormalW : NORMAL0; //worldspace vertex normal
     float3 SurfaceNormalW : NORMAL1; //worldspace surface normal
+    float4 ShadowPosH : SHADOW;
 };
 
 cbuffer PerApplication : register(b0)
@@ -13,7 +16,12 @@ cbuffer PerApplication : register(b0)
     float g_initialStepIterations;
     float g_refinementStepIterations;
     float g_parallaxDepth;
+    int g_shadowMode;
 }
+
+#define SHADOW_MODE_HARD 0
+#define SHADOW_MODE_PCF 1
+#define SHADOW_MODE_ESM 2
 
 cbuffer PerFrame : register(b1)
 {
@@ -36,8 +44,13 @@ Texture2D lichen1_bump : register(t6);
 Texture2D lichen2_bump : register(t7);
 Texture2D lichen3_bump : register(t8);
 
+Texture2D shadowMap : register(t9);
+
 SamplerState LinearRepeatAnsio : register(s0);
 SamplerState LinearRepeat : register(s1);
+
+SamplerComparisonState samplerShadowPCF : register(s2);
+SamplerState samplerShadowHard : register(s3);
 
 #define TEXTURE_SCALE 0.2
 #define FLAT_SHADING 0
@@ -177,9 +190,25 @@ float4 main(v2pConnector v2p) : SV_Target
                                   bumpMapNormal[2] * blend_weights.zzz;  // z-axis
 
     //----------------------- SIMPLE LIGHTNING FUNCTION ---------------------------
-    float4 lightIntensity = dot(g_sunLightDirection.xyz, normalize(pixelNormalW + blendedBumpMapNormal));
+    float4 lightIntensity = dot(-g_sunLightDirection.xyz, normalize(pixelNormalW + blendedBumpMapNormal));
     float4 final_color = saturate(lightIntensity * blendedColor);
-    float4 ambient = (0.1f * blendedColor);
-    final_color = normalize((float4(final_color.xyz, 1) + ambient));
-    return final_color;
+    //float4 ambient = (0.1f * blendedColor);
+    //final_color = normalize((float4(final_color.xyz, 1) + ambient));
+    //return final_color;
+
+    float shadowFactor = 1.f;
+    if(g_shadowMode == SHADOW_MODE_HARD)
+    {
+        shadowFactor = CalcShadowFactorHard(samplerShadowHard, shadowMap, v2p.ShadowPosH);
+    }
+    else if(g_shadowMode == SHADOW_MODE_PCF)
+    {
+        shadowFactor = CalcShadowFactorPCF(samplerShadowPCF, shadowMap, v2p.ShadowPosH);
+    }
+    else if(g_shadowMode == SHADOW_MODE_ESM)
+    {
+        shadowFactor = CalcShadowFactorESM(samplerShadowHard, shadowMap, v2p.ShadowPosH);
+    }
+    return final_color*0.1 + final_color * shadowFactor * 0.9;
 }
+

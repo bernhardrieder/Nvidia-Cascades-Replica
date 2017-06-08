@@ -11,6 +11,7 @@ struct v2pConnector
     float3 posW : POSITION; //worldspace coord
     float3 normalW : NORMAL0;
     float3 SurfaceNormalW : NORMAL1; //local surface normal
+    float4 ShadowPosH : SHADOW;
 };
 
 cbuffer PerApplication : register(b0)
@@ -36,6 +37,7 @@ cbuffer PerObject : register(b2)
 {
     float4x4 g_world;
     float4x4 g_worldInvTranspose;
+    float4x4 g_ShadowTransform;
 }
 
 v2pConnector main(a2vConnector a2v)
@@ -51,14 +53,15 @@ v2pConnector main(a2vConnector a2v)
 
     v2p.normalW = mul(g_worldInvTranspose, float4(a2v.normalL.xyz, 1.f)).xyz;
     v2p.normalW = normalize(v2p.normalW);
-    //v2p.normalW = a2v.normalL;
 
     v2p.SurfaceNormalW = mul(g_worldInvTranspose, float4(a2v.SurfaceNormalL.xyz, 1.f)).xyz;
     v2p.SurfaceNormalW = normalize(v2p.SurfaceNormalW);
 
     //transform to homogeneous clip space
-    //v2p.posH = mul(worldViewProj, float4(a2v.wsPosition.xyz, 1.f));
     v2p.posH = mul(g_viewProj, float4(v2p.posW.xyz, 1.f));
+
+    // Generate projective tex-coords to project shadow map onto scene.
+    v2p.ShadowPosH = mul(g_ShadowTransform, float4(v2p.posW.xyz, 1.0f));
     
     return v2p;
 }
