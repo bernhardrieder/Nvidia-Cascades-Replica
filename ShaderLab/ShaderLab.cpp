@@ -64,7 +64,7 @@ bool ShaderLab::Initialize()
 	m_fireParticles.shrink_to_fit();
 
 	m_commonStates = std::make_unique<CommonStates>(m_device);
-	m_camera.SetPosition(0., 0.0f, -20.f);
+	m_camera.SetPosition(0., 0.0f, 20.f);
 	onResize();
 	m_camera.LookAt(Vector3::Up, Vector3(0, 10, 0) - m_camera.GetPosition());
 	m_camera.UpdateViewMatrix();
@@ -92,7 +92,9 @@ void ShaderLab::update(float deltaTime)
 	m_cbPerFrame.ViewProj = m_camera.GetView() * m_camera.GetProj();
 	m_cbPerFrame.ScreenSize = { (float)m_windowWidth, (float)m_windowHeight, 0.f};
 	m_cbPerFrame.WorldEyePosition = static_cast<XMFLOAT3>(m_camera.GetPosition());
-	m_cbPerFrame.SunLightDirection = -MathHelper::SphericalToCartesian(1.0f, m_sunTheta, m_sunPhi);
+	Vector3 sunLightDirection = -MathHelper::SphericalToCartesian(1.0f, m_sunTheta, m_sunPhi);
+	sunLightDirection.Normalize();
+	m_cbPerFrame.SunLightDirection = sunLightDirection;
 	m_cbPerFrame.AppTime += deltaTime;
 	m_cbPerFrame.DeltaTime = deltaTime;
 
@@ -114,6 +116,24 @@ void ShaderLab::update(float deltaTime)
 		m_fireParticles[i]->Update(m_deviceContext, m_cbPerFrame.DeltaTime, m_cbPerFrame.AppTime, m_camera);
 }
 
+void ShaderLab::buildKdTreeForRaycasting()
+{
+	/* ----------- KD TREE -----------*/
+	std::vector<Triangle*> triPointer;
+	for (auto& triangle : m_rockTrianglesTransformed)
+		triPointer.push_back(&triangle);
+	std::cout << "Build kdTree ...";
+	m_rockKdTreeRoot.reset(KDNode::Build(triPointer, 0));
+	std::cout << " finished!\n";
+}
+
+void ShaderLab::createLightAndShadowResources()
+{
+	/* ----------- LIGHT & SHADOWS -----------*/
+	std::vector<Vector3> points = m_rockVBGenerator.ExtractVerticesFromVertexBuffer(m_deviceContext, m_worldMatrix);
+	BoundingSphere::CreateFromPoints(m_sceneBounds, points.size(), &points[0], sizeof(Vector3));
+}
+
 void ShaderLab::render()
 {
 	assert(m_device);
@@ -130,15 +150,11 @@ void ShaderLab::render()
 	{
 		std::cout << "Create rock vertexbuffer and extract triangles from vertexbuffer ...";
 		m_isRockVertexBufferGenerated = m_rockVBGenerator.Generate(m_deviceContext, m_densityTexGenerator.GetTexture3DShaderResourceView());
-		m_rockTrianglesTransformed = m_rockVBGenerator.extractTrianglesFromVertexBuffer(m_deviceContext, m_worldMatrix);
+		m_rockTrianglesTransformed = m_rockVBGenerator.ExtractTrianglesFromVertexBuffer(m_deviceContext, m_worldMatrix);
 		std::cout << " finished!\n";
 
-		std::vector<Triangle*> triPointer;
-		for (auto& triangle : m_rockTrianglesTransformed)
-			triPointer.push_back(&triangle);
-		std::cout << "Build kdTree ...";
-		m_rockKdTreeRoot.reset(KDNode::Build(triPointer, 0));
-		std::cout << " finished!\n";
+		buildKdTreeForRaycasting();
+		createLightAndShadowResources();
 	}
 
 	auto vb = m_rockVBGenerator.GetVertexBuffer();
@@ -167,7 +183,7 @@ void ShaderLab::render()
 	auto sampler = m_commonStates->LinearWrap();
 	m_deviceContext->PSSetSamplers(0, 1, &m_lichenSampler);
 	m_deviceContext->PSSetSamplers(1, 1, &sampler);
-	m_deviceContext->PSSetSamplers(2, 1, &m_shadowMapSampler);
+	m_deviceContext->PSSetSamplers(2, 1, &m_shadowMapSamplerPCF);
 	m_deviceContext->PSSetShaderResources(0, 1, &m_texturesSRVs[14]);
 	m_deviceContext->PSSetShaderResources(1, 1, &m_texturesSRVs[3]);
 	m_deviceContext->PSSetShaderResources(2, 1, &m_texturesSRVs[18]);
@@ -293,23 +309,25 @@ void ShaderLab::checkAndProcessKeyboardInput(float deltaTime)
 	
 	//m_keyboardStateTracker.IsKeyPressed(Keyboard::Keys::W) --> returns true if button is pressed (the first time)
 	//state.W --> return true if button is held
+
 	static float cameraSpeed = 10.f;
+	float camSpeedMultiplier = !state.LeftShift ? 1.f : 3.f;
 	if (state.W)
-		m_camera.Walk(cameraSpeed * deltaTime);
+		m_camera.Walk(cameraSpeed * deltaTime * camSpeedMultiplier);
 	if (state.S)
-		m_camera.Walk(-cameraSpeed * deltaTime);
+		m_camera.Walk(-cameraSpeed * deltaTime * camSpeedMultiplier);
 	if (state.A)
-		m_camera.Strafe(-cameraSpeed * deltaTime);
+		m_camera.Strafe(-cameraSpeed * deltaTime * camSpeedMultiplier);
 	if (state.D)
-		m_camera.Strafe(cameraSpeed * deltaTime);
+		m_camera.Strafe(cameraSpeed * deltaTime * camSpeedMultiplier);
 	m_camera.UpdateViewMatrix();
 
 	//SUN ROTATION
-	m_sunPhi = MathHelper::Clamp(m_sunPhi, 0.1f, XM_PIDIV2);
+	m_sunPhi = MathHelper::Clamp(m_sunPhi, 0.1f, XM_PI);
 	if (state.Up)
-		m_sunPhi += 1.0f*deltaTime;
-	if (state.Down)
 		m_sunPhi -= 1.0f*deltaTime;
+	if (state.Down)
+		m_sunPhi += 1.0f*deltaTime;
 	if (state.Left)
 		m_sunTheta -= 1.0f*deltaTime;
 	if (state.Right)
@@ -462,7 +480,7 @@ bool ShaderLab::createSampler(ID3D11Device* device)
 
 	// SHADOW MAP SAMPLER
 	ZeroMemory(&desc, sizeof(D3D11_SAMPLER_DESC));
-	desc.Filter = D3D11_FILTER_MIN_MAG_LINEAR_MIP_POINT;
+	desc.Filter = D3D11_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT;
 	desc.AddressU = D3D11_TEXTURE_ADDRESS_BORDER;
 	desc.AddressV = D3D11_TEXTURE_ADDRESS_BORDER;
 	desc.AddressW = D3D11_TEXTURE_ADDRESS_BORDER;
@@ -472,7 +490,7 @@ bool ShaderLab::createSampler(ID3D11Device* device)
 	desc.BorderColor[3] = 0.f;
 	desc.ComparisonFunc = D3D11_COMPARISON_LESS;
 
-	if (FAILED(hr = device->CreateSamplerState(&desc, &m_shadowMapSampler)))
+	if (FAILED(hr = device->CreateSamplerState(&desc, &m_shadowMapSamplerPCF)))
 		return false;
 
 	return true;
@@ -481,6 +499,7 @@ bool ShaderLab::createSampler(ID3D11Device* device)
 void ShaderLab::releaseSampler()
 {
 	SafeRelease(m_lichenSampler);
+	SafeRelease(m_shadowMapSamplerPCF);
 }
 
 HitResult ShaderLab::raycast(int sx, int sy, Ray& outRay)

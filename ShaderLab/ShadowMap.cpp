@@ -71,7 +71,7 @@ bool ShadowMap::Initialize(ID3D11Device* const device)
 	return true;
 }
 
-void ShadowMap::Update(ID3D11DeviceContext* const deviceContext, DirectX::BoundingSphere sceneBounds, DirectX::SimpleMath::Vector3 sunLightDirection)
+void ShadowMap::Update(ID3D11DeviceContext* const deviceContext, const DirectX::BoundingSphere& sceneBounds, const DirectX::SimpleMath::Vector3& sunLightDirection)
 {
 	calculateShadowTransform(sceneBounds, sunLightDirection);
 	deviceContext->UpdateSubresource(m_constantBuffers[CB_Frame], 0, nullptr, &m_cbPerFrame, 0, 0);
@@ -115,11 +115,11 @@ void ShadowMap::RenderIntoShadowMap(ID3D11DeviceContext* const deviceContext, ID
 	deviceContext->OMSetRenderTargets(0, nullptr, nullptr);
 }
 
-void ShadowMap::calculateShadowTransform(DirectX::BoundingSphere sceneBounds, DirectX::SimpleMath::Vector3 sunLightDirection)
+void ShadowMap::calculateShadowTransform(const DirectX::BoundingSphere& sceneBounds, const DirectX::SimpleMath::Vector3& sunLightDirection)
 {	
 	// Only the first "main" light casts a shadow.
-	Vector3 lightPos = -1.0f * sceneBounds.Radius * sunLightDirection;
-	Vector3 targetPos = Vector3::Zero;
+	Vector3 lightPos =  sceneBounds.Radius * -sunLightDirection;
+	Vector3 targetPos = sceneBounds.Center;
 
 	Matrix lightView = XMMatrixLookAtLH(lightPos, targetPos, Vector3::Up);
 

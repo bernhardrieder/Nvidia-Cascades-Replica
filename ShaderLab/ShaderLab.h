@@ -22,13 +22,16 @@ public:
 private:	
 	void update(float deltaTime) override;
 	void render() override;
-	bool loadShaders();
-	void unloadShaders();
 	void onResize() override;
 	void checkAndProcessKeyboardInput(float deltaTime) override;
 	void checkAndProcessMouseInput(float deltaTime) override;
 	bool initDirectX() override;
 	void cleanup() override;
+
+	void buildKdTreeForRaycasting();
+	void createLightAndShadowResources();
+	bool loadShaders();
+	void unloadShaders();
 
 	bool createTextures(ID3D11Device* device);
 	void releaseTextures();
@@ -142,6 +145,6 @@ private:
 
 	const int m_shadowMapSize = 2048;
 	ShadowMap m_shadowMap;
-	DirectX::BoundingSphere m_sceneBounds = BoundingSphere(Vector3::Zero, 50);
-	ID3D11SamplerState* m_shadowMapSampler = nullptr;
+	DirectX::BoundingSphere m_sceneBounds;
+	ID3D11SamplerState* m_shadowMapSamplerPCF = nullptr;
 };

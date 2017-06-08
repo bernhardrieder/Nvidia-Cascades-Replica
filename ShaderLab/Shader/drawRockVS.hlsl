@@ -53,17 +53,15 @@ v2pConnector main(a2vConnector a2v)
 
     v2p.normalW = mul(g_worldInvTranspose, float4(a2v.normalL.xyz, 1.f)).xyz;
     v2p.normalW = normalize(v2p.normalW);
-    //v2p.normalW = a2v.normalL;
 
     v2p.SurfaceNormalW = mul(g_worldInvTranspose, float4(a2v.SurfaceNormalL.xyz, 1.f)).xyz;
     v2p.SurfaceNormalW = normalize(v2p.SurfaceNormalW);
 
     //transform to homogeneous clip space
-    //v2p.posH = mul(worldViewProj, float4(a2v.wsPosition.xyz, 1.f));
     v2p.posH = mul(g_viewProj, float4(v2p.posW.xyz, 1.f));
 
     // Generate projective tex-coords to project shadow map onto scene.
-    v2p.ShadowPosH = mul(float4(a2v.posL.xyz, 1.0f), g_ShadowTransform);
+    v2p.ShadowPosH = mul(g_ShadowTransform, float4(v2p.posW.xyz, 1.0f));
     
     return v2p;
 }

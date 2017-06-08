@@ -1,7 +1,7 @@
 static const float SMAP_SIZE = 2048.0f;
 static const float SMAP_DX = 1.0f / SMAP_SIZE;
 
-float CalcShadowFactor(SamplerComparisonState samShadow,
+float CalcShadowFactorPCF(SamplerComparisonState samShadow,
                        Texture2D shadowMap,
 					   float4 shadowPosH)
 {

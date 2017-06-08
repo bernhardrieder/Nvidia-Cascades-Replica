@@ -45,15 +45,6 @@ SamplerState LinearRepeatAnsio : register(s0);
 SamplerState LinearRepeat : register(s1);
 
 SamplerComparisonState samShadow : register(s2);
-//{
-//    Filter = COMPARISON_MIN_MAG_LINEAR_MIP_POINT;
-//    AddressU = BORDER;
-//    AddressV = BORDER;
-//    AddressW = BORDER;
-//    BorderColor = float4(0.0f, 0.0f, 0.0f, 0.0f);
-
-//    ComparisonFunc = LESS;
-//};
 
 #define TEXTURE_SCALE 0.2
 #define FLAT_SHADING 0
@@ -193,13 +184,13 @@ float4 main(v2pConnector v2p) : SV_Target
                                   bumpMapNormal[2] * blend_weights.zzz;  // z-axis
 
     //----------------------- SIMPLE LIGHTNING FUNCTION ---------------------------
-    //float4 lightIntensity = dot(g_sunLightDirection.xyz, normalize(pixelNormalW + blendedBumpMapNormal));
-    //float4 final_color = saturate(lightIntensity * blendedColor);
+    float4 lightIntensity = dot(-g_sunLightDirection.xyz, normalize(pixelNormalW + blendedBumpMapNormal));
+    float4 final_color = saturate(lightIntensity * blendedColor);
     //float4 ambient = (0.1f * blendedColor);
     //final_color = normalize((float4(final_color.xyz, 1) + ambient));
     //return final_color;
 
-    float shadowFactor = CalcShadowFactor(samShadow, shadowMap, v2p.ShadowPosH);
-    return blendedColor * (shadowFactor);
+    float shadowFactor = CalcShadowFactorPCF(samShadow, shadowMap, v2p.ShadowPosH);
+    return final_color*0.1 + final_color * shadowFactor * 0.9;
 }
 

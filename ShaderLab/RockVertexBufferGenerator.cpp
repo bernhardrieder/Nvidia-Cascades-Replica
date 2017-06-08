@@ -291,7 +291,7 @@ int RockVertexBufferGenerator::createDummyVertices(VertexShaderInput** outVertic
 	return size;
 }
 
-std::vector<Triangle> RockVertexBufferGenerator::extractTrianglesFromVertexBuffer(ID3D11DeviceContext* pDeviceContext, const Matrix& triangleSRT) const
+std::vector<Triangle> RockVertexBufferGenerator::ExtractTrianglesFromVertexBuffer(ID3D11DeviceContext* pDeviceContext, const Matrix& triangleSRT) const
 {
 	//see https://www.gamedev.net/blog/272/entry-1913400-using-d3d11-stream-out-for-debugging/
 	std::vector<Triangle> triangles;
@@ -327,6 +327,35 @@ std::vector<Triangle> RockVertexBufferGenerator::extractTrianglesFromVertexBuffe
 	}
 
 	return triangles;
+}
+
+std::vector<DirectX::SimpleMath::Vector3> RockVertexBufferGenerator::ExtractVerticesFromVertexBuffer(ID3D11DeviceContext* pDeviceContext, const DirectX::SimpleMath::Matrix& SRT) const
+{
+	//see https://www.gamedev.net/blog/272/entry-1913400-using-d3d11-stream-out-for-debugging/
+	std::vector<Vector3> vertices;
+	pDeviceContext->CopyResource(m_stagedVertexBuffer, m_vertexBuffer);
+
+	D3D11_MAPPED_SUBRESOURCE data;
+	if (SUCCEEDED(pDeviceContext->Map(m_stagedVertexBuffer, 0, D3D11_MAP_READ, 0, &data)))
+	{
+		GeometryShaderOutput *pRaw = reinterpret_cast< GeometryShaderOutput*>(data.pData);
+
+		D3D11_QUERY_DATA_PIPELINE_STATISTICS stats;
+		while (S_OK != pDeviceContext->GetData(m_deviceStats, &stats, m_deviceStats->GetDataSize(), 0));
+		
+		for (size_t i = 0; i < stats.GSPrimitives * 3;++i)
+		{
+			if (!(pRaw[i].LocalPosition.x != pRaw[i].LocalPosition.x || pRaw[i].LocalPosition.y != pRaw[i].LocalPosition.y || pRaw[i].LocalPosition.z != pRaw[i].LocalPosition.z))
+			{
+				//NaN not detected!		
+				vertices.push_back(Vector3::Transform({ pRaw[i].LocalPosition.x , pRaw[i].LocalPosition.y , pRaw[i].LocalPosition.z }, SRT));
+			}
+		}
+
+		pDeviceContext->Unmap(m_stagedVertexBuffer, 0);
+	}
+
+	return vertices;
 }
 
 void RockVertexBufferGenerator::releaseSamplerStates()

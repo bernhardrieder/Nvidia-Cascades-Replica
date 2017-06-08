@@ -11,7 +11,7 @@ public:
 	~ShadowMap();
 
 	bool Initialize(ID3D11Device* const device);
-	void Update(ID3D11DeviceContext* const deviceContext, DirectX::BoundingSphere sceneBounds, DirectX::SimpleMath::Vector3 sunLightDirection);
+	void Update(ID3D11DeviceContext* const deviceContext, const DirectX::BoundingSphere& sceneBounds, const DirectX::SimpleMath::Vector3& sunLightDirection);
 	void RenderIntoShadowMap(ID3D11DeviceContext* const deviceContext, ID3D11Buffer* const vertexBuffer, ID3D11InputLayout* const inputLayout, const DirectX::SimpleMath::Matrix& world);
 	ID3D11ShaderResourceView* GetDepthMapSRV() const;
 	const DirectX::SimpleMath::Matrix& GetShadowTransform() const;
@@ -21,7 +21,7 @@ private:
 	bool createRasterizerState(ID3D11Device* const device);
 	bool createConstantBuffer(ID3D11Device* const device);
 
-	void calculateShadowTransform(DirectX::BoundingSphere sceneBounds, DirectX::SimpleMath::Vector3 sunLightDirection);
+	void calculateShadowTransform(const DirectX::BoundingSphere& sceneBounds, const DirectX::SimpleMath::Vector3& sunLightDirection);
 
 	enum ShaderConstanBufferType
 	{
