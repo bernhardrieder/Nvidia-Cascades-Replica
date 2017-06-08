@@ -371,8 +371,10 @@ void ShaderLab::checkAndProcessKeyboardInput(float deltaTime)
 		m_cbPerApplication.ShadowMode = static_cast<int>(ShadowModes::HardShadows);
 	else if(m_keyboardStateTracker.IsKeyPressed(Keyboard::Keys::F2))
 		m_cbPerApplication.ShadowMode = static_cast<int>(ShadowModes::SoftShadow_PCF);
+	else if (m_keyboardStateTracker.IsKeyPressed(Keyboard::Keys::F3))
+		m_cbPerApplication.ShadowMode = static_cast<int>(ShadowModes::SoftShadow_ESM);
 
-	if (state.O || state.P || state.K || state.L || state.N || state.M || state.F1 || state.F2)
+	if (state.O || state.P || state.K || state.L || state.N || state.M || state.F1 || state.F2 || state.F3)
 		m_updateCbPerApplication = true;
 }
 

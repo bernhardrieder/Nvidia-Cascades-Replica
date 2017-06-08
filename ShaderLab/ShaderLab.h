@@ -62,7 +62,7 @@ private:
 	{
 		HardShadows = 0,
 		SoftShadow_PCF,
-		SoftShadow_VSM
+		SoftShadow_ESM
 	};
 	struct CbPerApplication
 	{

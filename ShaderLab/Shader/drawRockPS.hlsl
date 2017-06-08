@@ -21,6 +21,7 @@ cbuffer PerApplication : register(b0)
 
 #define SHADOW_MODE_HARD 0
 #define SHADOW_MODE_PCF 1
+#define SHADOW_MODE_ESM 2
 
 cbuffer PerFrame : register(b1)
 {
@@ -203,6 +204,10 @@ float4 main(v2pConnector v2p) : SV_Target
     else if(g_shadowMode == SHADOW_MODE_PCF)
     {
         shadowFactor = CalcShadowFactorPCF(samplerShadowPCF, shadowMap, v2p.ShadowPosH);
+    }
+    else if(g_shadowMode == SHADOW_MODE_ESM)
+    {
+        shadowFactor = CalcShadowFactorESM(samplerShadowHard, shadowMap, v2p.ShadowPosH);
     }
     return final_color*0.1 + final_color * shadowFactor * 0.9;
 }
