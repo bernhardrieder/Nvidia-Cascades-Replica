@@ -84,4 +84,4 @@ inline void SafeRelease(T& ptr)
 #include "Density3DTextureGenerator.h"
 #include "CollisionDetectionHelper.h"
 #include "KdTree.h"
-
+#include "ShadowMap.h"

@@ -52,4 +52,14 @@ float3 RandUnitVec3(Texture1D randomTex, SamplerState linearSampler, float gameT
 	// project onto unit sphere
     return normalize(v);
 }
+
+float3 RandVec3(Texture1D randomTex, SamplerState linearSampler, float gameTime, float offset)
+{
+	// Use game time plus offset to sample random texture.
+    float u = (gameTime + offset);
+	
+	// coordinates in [-1,1]
+    float3 v = randomTex.SampleLevel(linearSampler, u, 0).xyz;
+    return v;
+}
  

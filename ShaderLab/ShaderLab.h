@@ -7,9 +7,7 @@
 #include <SimpleMath.h>
 #include "CollisionDetectionHelper.h"
 #include "KdTree.h"
-
-using namespace DirectX;
-using namespace DirectX::SimpleMath;
+#include "ShadowMap.h"
 
 class ShaderLab : public D3D11App
 {
@@ -24,13 +22,16 @@ public:
 private:	
 	void update(float deltaTime) override;
 	void render() override;
-	bool loadShaders();
-	void unloadShaders();
 	void onResize() override;
 	void checkAndProcessKeyboardInput(float deltaTime) override;
 	void checkAndProcessMouseInput(float deltaTime) override;
 	bool initDirectX() override;
 	void cleanup() override;
+
+	void buildKdTreeForRaycasting();
+	void createLightAndShadowResources();
+	bool loadShaders();
+	void unloadShaders();
 
 	bool createTextures(ID3D11Device* device);
 	void releaseTextures();
@@ -38,6 +39,7 @@ private:
 	void releaseSampler();
 
 	HitResult raycast(int sx, int sy, DirectX::SimpleMath::Ray& outRay);
+
 private:
 	// Shader resources
 	enum ShaderConstanBufferType
@@ -56,6 +58,12 @@ private:
 		DirectX::XMFLOAT3 LocalSurfaceNormal;
 	};
 
+	enum class ShadowModes : int
+	{
+		HardShadows = 0,
+		SoftShadow_PCF,
+		SoftShadow_ESM
+	};
 	struct CbPerApplication
 	{
 		XMMATRIX Proj;
@@ -63,6 +71,7 @@ private:
 		float InitialStepIterations;
 		float RefinementStepIterations;
 		float ParallaxDepth;
+		int ShadowMode;
 	};
 
 	struct CbPerFrame
@@ -81,6 +90,7 @@ private:
 	{
 		XMMATRIX World;
 		XMMATRIX WorldInverseTranspose;
+		XMMATRIX ShadowTransform;
 	};
 
 	CbPerApplication m_cbPerApplication;
@@ -91,11 +101,11 @@ private:
 	float m_sunPhi = DirectX::XM_PIDIV2;
 
 	// Vertex buffer data
-	ID3D11InputLayout* m_inputLayoutSimpleVS = nullptr;
+	ID3D11InputLayout* m_inputLayoutDrawRockVS = nullptr;
 
 	// Shader data
-	ID3D11VertexShader* m_simpleVS = nullptr;
-	ID3D11PixelShader* m_simplePS = nullptr;
+	ID3D11VertexShader* m_drawRockVS = nullptr;
+	ID3D11PixelShader* m_drawRockPS = nullptr;
 
 #if _DEBUG
 	const wchar_t* m_compiledVSPath = L"Shader/drawRockVS_d.cso";
@@ -139,4 +149,10 @@ private:
 	std::wstring m_fireParticlesShaderNamePrefix = L"Fire";
 	std::wstring m_fireParticlesTextureFile = L"flare0";
 	std::vector<ParticleSystem*> m_fireParticles;
+
+	const int m_shadowMapSize = 2048;
+	ShadowMap m_shadowMap;
+	DirectX::BoundingSphere m_sceneBounds;
+	ID3D11SamplerState* m_shadowMapSamplerHard = nullptr;
+	ID3D11SamplerState* m_shadowMapSamplerPCF = nullptr;
 };

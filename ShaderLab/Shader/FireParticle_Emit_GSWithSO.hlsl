@@ -10,15 +10,17 @@ void main(point Particle particle[1], inout PointStream<Particle> outStream)
 		// time to emit a new particle?
         if (particle[0].Age > 0.005f)
         {
-            float3 randomVector = RandUnitVec3(gRandomTex, samLinear, gGameTime, 0);
+            float3 randomVector = RandUnitVec3(gRandomTex, samLinear, gGameTime, gDeltaTime);
             randomVector.x *= 0.2f;
             randomVector.z *= 0.2f;
-            float3 randRangeZeroToOne = randomVector * 0.5f + 0.5f;
+            float3 randRangeZeroToOne = RandVec3(gRandomTex, samLinear, gGameTime, 0) * 0.5f + 0.5f;
 
             Particle p;
             p.InitialPosW = float4(gEmitPosW.xyz, 0.f);
-            p.InitialVelW = 4.0f * float4(randomVector.xyz, 0.f);
-            p.SizeW = max(float2(randRangeZeroToOne.x, randRangeZeroToOne.x) * 5.f, float2(1.f, 1.f));
+            p.InitialVelW = randRangeZeroToOne.y * 4.0f * float4(randomVector.xyz, 0.f);
+            p.SizeW = particle[0].SizeW * max(0.1f,randRangeZeroToOne.xy);
+            //offset position so billboard doesn't appear in geometry
+            p.InitialPosW += normalize(gEmitDirW) * (p.SizeW.y * 0.4f);
             p.Age = 0.f;
             p.Type = PT_FLARE;
 			
